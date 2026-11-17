@@ -1,45 +1,43 @@
-# wire-glass
+# Wire Glass
 
-Private working repository for the wired-glass greenhouse and interactive WebGPU rain. The complete website project was preserved here from the working `site` checkout, including its other pages, source, tests, saved glass defaults and public assets.
+A standalone React and Three.js greenhouse with wired patterned glass, procedural foliage, interactive WebGPU rain, ambient recordings and an interactive glass glossary.
 
-Glass development continues here. The original site draft PR is https://github.com/neilsonnn/site/pull/2, checkpoint `6a3b956`.
+## Run locally
 
-Run the app with the commands below, then open **http://127.0.0.1:5173/glass/**. The glass app requires WebGPU. Its implementation notes are in [the rain README](neilsonks/src/glass/rain/README.md).
-
-Source for Neilson’s websites. Each website lives in its own folder directly under the repository root, with its own dependencies and build configuration.
-
-## Websites
-
-| Folder | Website |
-| --- | --- |
-| [`neilsonks`](neilsonks/README.md) | neilsonks.com — portfolio, books, About page, and fullscreen Chess homepage |
-
-## Run neilsonks locally
+Use Node.js 22 or newer. Run from this repository root:
 
 ```sh
-cd neilsonks
 npm ci
 npm run dev
 ```
 
-Validate and build with `npm run check` and `npm run build` from the same folder. Publish only `neilsonks/dist/` to a static host.
+Open http://127.0.0.1:5173/. The previous http://127.0.0.1:5173/glass/ address also works. WebGPU is required for the rain simulation. The greenhouse is drawn with Three.js/WebGL.
 
-## Repository layout
+Left-click or touch to add water; hold or drag to continue. Right-drag or swipe with two fingers to orbit. Scroll or pinch to zoom. Debug controls open at the bottom left, and the FPS counter opens frame timings. The glass glossary pauses the scene while open.
 
-```text
-wire-glass/
-  neilsonks/
-    public/
-    src/
-    tests/
-    package.json
-    package-lock.json
+## Settings and scene versions
+
+**Save page defaults** writes to `src/glass/default-presets.json` during local development. **Export JSON** makes a recovery copy. Existing browser storage keys are retained so the extraction does not discard saved settings. Earlier compositions and the Current study remain available through the archived scenes controls in development.
+
+## Build
+
+```sh
+npm run build
+npm run preview
 ```
 
-Add future websites beside `neilsonks/`. Each site can be built and deployed independently.
+Publish `dist/` to a static host. The build includes both `/` and `/glass/` entry pages. This repository has a build-only GitHub Actions workflow; it has no deployment configuration tied to the original portfolio. `npm run check` runs TypeScript and the glass tests.
 
-The original website repository and standalone chess project remain separate. Writing drafts, private original-site backups, dependencies, build output, and local screenshots are excluded from this repository.
+## Source
 
-## Deployment
+- `src/glass/`: scenes, shaders, procedural plants, controls and glossary.
+- `src/glass/rain/`: rain and water simulation; [implementation notes](src/glass/rain/README.md).
+- `public/audio/`: the two attributed ambient recordings.
+- `public/images/glass/`: the original visual reference.
 
-[Webdock deployment setup and the remaining launch tasks](DEPLOYMENT.md) describe the GitHub Actions workflow, required server settings, safe staging, rollback, and enabling deploy-on-push after the live-file audit.
+The saved composition, audio attribution, simulation behavior and archived glass versions are retained from the original project. Source recording links and licenses are also available in the Rain shower controls:
+
+- [digifishmusic — rain on tin roof](https://freesound.org/people/digifishmusic/sounds/66472/) — CC BY 4.0.
+- [willpio — rain on glass](https://freesound.org/people/willpio/sounds/317677/) — CC BY-NC 3.0.
+
+The original site draft PR is https://github.com/neilsonnn/site/pull/2, checkpoint `6a3b956`. The complete pre-extraction website snapshot remains in this repository's first commit, `2e09ab8`.
