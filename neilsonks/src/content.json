@@ -1,0 +1,1107 @@
+{
+  "projects": [
+    {
+      "title": "image-blaster",
+      "metadata": "2026 — Developer",
+      "image": "/gif/image-blaster-small.gif",
+      "description": "Image-to-world toolkit that generates 3D models, environment, audio, and physics.",
+      "links": [
+        {
+          "label": "Github",
+          "href": "https://github.com/neilsonnn/image-blaster"
+        },
+        {
+          "label": "Hacker News",
+          "href": "https://news.ycombinator.com/item?id=48150069"
+        }
+      ],
+      "details": "",
+      "video": null,
+      "hidden": false
+    },
+    {
+      "title": "Oakwood St. Studio",
+      "metadata": "2025",
+      "image": "/gif/oakwood-studio.jpg",
+      "description": "Design space in the Mission Dolores of San Francisco.",
+      "links": [
+        {
+          "label": "Website",
+          "href": "https://oakwood-studio.github.io/"
+        }
+      ],
+      "details": "",
+      "video": null,
+      "hidden": false
+    },
+    {
+      "title": "Spark",
+      "metadata": "2024 — Design Engineer",
+      "image": "/gif/illusionoflife-dog.gif",
+      "description": "A living character with realtime cognition and animation.",
+      "links": [],
+      "details": "",
+      "video": null,
+      "hidden": false,
+      "imageFit": "contain"
+    },
+    {
+      "title": "colorful-concepts",
+      "metadata": "2024 — Designer",
+      "image": "/gif/colorful-concepts.gif",
+      "description": "Combine words into new concepts.",
+      "links": [
+        {
+          "label": "Play",
+          "href": "https://concepts.engine.study/"
+        }
+      ],
+      "details": "",
+      "video": null,
+      "hidden": true
+    },
+    {
+      "title": "Text Interfaces",
+      "metadata": "2024 — Designer",
+      "image": "/gif/LLM2.gif",
+      "description": "Speculative interfaces with LLMs.",
+      "links": [
+        {
+          "label": "X",
+          "href": "https://twitter.com/neilsonks/status/1744805355182608680"
+        }
+      ],
+      "details": "",
+      "video": null,
+      "hidden": true
+    },
+    {
+      "title": "AoE II Mod",
+      "metadata": "2023 — Designer",
+      "image": "/gif/AoEIISprite_Wide.gif",
+      "description": "Modding Age of Empires civilizations with Stable Diffusion.",
+      "links": [
+        {
+          "label": "Hacker News",
+          "href": "https://news.ycombinator.com/item?id=36025507"
+        }
+      ],
+      "details": "<p>\n                                Front Page - <a href=\"https://news.ycombinator.com/item?id=36025507\" target=\"_blank\">Hacker News</a><br>\n                            </p>",
+      "video": null,
+      "hidden": false
+    },
+    {
+      "title": "Stranger Things VR",
+      "metadata": "2023 — Senior Designer, Tender Claws",
+      "image": "/gif/strangerthings.gif",
+      "description": "Narrative adventure game set in the penultimate season of the show.",
+      "links": [
+        {
+          "label": "Website",
+          "href": "https://tenderclaws.com/strangerthingsvr"
+        }
+      ],
+      "details": "",
+      "video": null,
+      "hidden": false
+    },
+    {
+      "title": "Gaul",
+      "metadata": "2023 — Designer",
+      "image": "/gif/Gaul_Small.gif",
+      "description": "We found our toil etched in straight lines.",
+      "links": [
+        {
+          "label": "Website",
+          "href": "https://engine.study/gaul/"
+        }
+      ],
+      "details": "<p>\n                                Official Selection - <a href=\"https://aw.network/2023/\" target=\"_blank\">Autonomous\n                                    Worlds Assembly</a><br>\n                            </p>",
+      "video": null,
+      "hidden": true
+    },
+    {
+      "title": "engine.study",
+      "metadata": "2022 — Designer",
+      "image": "/gif/engine.study%20Neilson%201%20Small.gif",
+      "description": "A multiplayer user dungeon for onchain players.",
+      "links": [
+        {
+          "label": "X",
+          "href": "https://twitter.com/neilsonks/status/1637211630508417025"
+        }
+      ],
+      "details": "<p>\n                                <a>MUTEK 2022</a> - Official Selection<br>\n                                <a>Trust Microgrant</a> - Recipient<br>\n                            </p>",
+      "video": null,
+      "hidden": false
+    },
+    {
+      "title": "KOSMOS / NEKROS",
+      "metadata": "2021 — Filmmaker, The Terraforming",
+      "image": "/gif/KOSMOS_NEKROS_2_NEILSON_SMALL.gif",
+      "description": "An essay on the limits of human knowledge and experience through space / death.",
+      "links": [
+        {
+          "label": "Watch",
+          "href": "https://www.youtube.com/watch?v=N4ycRUTbSFI"
+        }
+      ],
+      "details": "",
+      "video": null,
+      "hidden": false
+    },
+    {
+      "title": "Crystal Palace",
+      "metadata": "2021 — Director, SCRNPRNT",
+      "image": "/gif/Crystal%20Palace%20GIF%207.gif",
+      "description": "A playable theatre of computation between machine learning agents, a Great Exhibition.",
+      "links": [],
+      "details": "<p>\n                                <a>Smartification of Everything 2022</a> - Installation<br>\n                                <a>NEURIPS 2021</a> - Online Showcase<br>\n                                <a>Canada Council for the Arts 2021</a> - Grant<br>\n                            </p>",
+      "video": null,
+      "hidden": false
+    },
+    {
+      "title": "Two Half Words",
+      "metadata": "2021 — Director, SCRNPRNT",
+      "image": "/gif/TwoHalfWordsGIF1.gif",
+      "description": "A digital listening experience with musician Sam Tudor.",
+      "links": [
+        {
+          "label": "Play",
+          "href": "http://scrnprnt.ca/TwoHalfWords"
+        }
+      ],
+      "details": "<p>\n                                \"Takes us inside a creaky, mesmerizing virtual gallery.\" - <a href=\"https://www.vice.com/en/article/5dbp8a/goodbye-album-listening-party-hello-musical-walking-sim\" target=\"_blank\">Vice Games</a><br>\n                            </p>",
+      "video": null,
+      "hidden": false
+    },
+    {
+      "title": "Age Of",
+      "metadata": "2021 — Director, SCRNPRNT",
+      "image": "/gif/The%20Garden%20Of%20Earthly%20Delights%201%20Neilson%20Koerner-Safrata.gif",
+      "description": "An online chatroom for the animals of <i>Age of Empires II</i>.",
+      "links": [
+        {
+          "label": "Play",
+          "href": "http://scrnprnt.ca/TheGardenOfEarthlyDelights"
+        }
+      ],
+      "details": "<p>\n                                <a>Now Play This 2021</a> - Official Selection<br>\n                                <a>Next Level 2021</a> - Official Selection<br>\n                                <a>Overkill Festival 2021</a> - Official Selection<br>\n                                <a>Sympoietiques 2020</a> - Official Selection<br>\n                                <br>\n                                \"Simple yet potent [...] a neat microcosm.\" - <a href=\"https://www.vice.com/en_us/article/akzpz5/a-chat-room-for-age-of-empires-ii-animals-only\" target=\"_blank\">Vice Games</a><br>\n                                \"An eagle barked like a dog. Absurd. Brilliant.\" - <a href=\"https://www.rockpapershotgun.com/2020/09/05/the-garden-of-earthly-delights-turns-age-of-empires-into-an-animal-chatroom/\" target=\"_blank\">Rock Paper Shotgun</a><br>\n                            </p>",
+      "video": null,
+      "hidden": false
+    },
+    {
+      "title": "DUSTNET",
+      "metadata": "2019 — Director, SCRNPRNT",
+      "image": "/gif/DUSTNET%201%20Neilson%20Koerner-Safrata.gif",
+      "description": "A server hosting the ruins of <i>Counter-Strike</i>.",
+      "links": [
+        {
+          "label": "Website",
+          "href": "http://scrnprnt.ca/DUSTNET.html"
+        },
+        {
+          "label": "Steam",
+          "href": "https://store.steampowered.com/app/987290/DUSTNET/"
+        }
+      ],
+      "details": "<p>\n\n                                <a>Now Play This 2020</a> - Official Selection<br>\n                                <a>A MAZE. 2020</a> - Official Selection<br><br>\n                                \"The ideas explored in Dustnet feel essential.\" - <a href=\"https://www.pcgamer.com/dustnet-game/\" target=\"_blank\">PCGamer</a><br>\n                                \"A strange and wonderful dream.\" - <a href=\"https://www.rockpapershotgun.com/2019/07/18/dustnet-is-a-strange-and-wonderful-dream-of-the-last-de_dust2-server/\" target=\"_blank\">Rock Paper Shotgun</a><br>\n                                \"A fascinating place to visit.\" - <a href=\"https://kotaku.com/in-dustnet-you-explore-the-ruins-of-one-of-video-games-1836501932\" target=\"_blank\">Kotaku</a>\n                            </p>",
+      "video": null,
+      "hidden": false
+    },
+    {
+      "title": "Virtual Virtual Reality",
+      "metadata": "2017 — Lead Designer, Tender Claws",
+      "image": "/gif/Virtual%20Virtual%20Reality%201%20Neilson%20Koerner-Safrata.gif",
+      "description": "A game about VR, A.I. and our shared sci-fi fever dreams.",
+      "links": [
+        {
+          "label": "Website",
+          "href": "http://vvr.tenderclaws.com/"
+        },
+        {
+          "label": "Oculus",
+          "href": "https://www.oculus.com/experiences/go/1389161184521528/"
+        }
+      ],
+      "details": "<p>\n                                <b>Google Play Awards 2017</b> - Best VR Experience<br>\n                                <b>Raindance Film Festival 2017</b> - Best Mobile Interactive Experience<br>\n                                <b>International Mobile Gaming Awards 2018</b> - Best VR Game<br>\n                                <b>Future of StoryTelling 2017</b> - Finalist, People's Choice Award<br>\n                                <b>Unity Awards 2017</b> - Finalist, Best VR Game<br>\n                                <b>Vision VR/AR Awards 2017</b> - Finalist, Best Game<br>\n                                <b>VR Awards 2017</b> - Finalist, VR Game of the Year<br>\n                                <b>Independent Games Festival 2019</b> - Honorable Mention, Grand Prize<br>\n                                <b>IndieCade 2017</b> - Official Selection<br>\n                                <!--<br />\n                        \"An absurdist black comedy [...] that plays with ideas of tourism, travel and authority.\" - Laura Parker, The New York Times<br />\n                        \"All is not what it seems in this darkly comic and visually stunning outing.\" - Matthew Field, The Telegraph <br />\n                        \"A lovingly cheeky response to artists’ early hopes for the medium.\" - Cecilia D'Anastasio, Kotaku <br />\n                        \"Equal parts trippy and humorous.\" - Sam Machkovech, Ars Technica <br />\n                        \"A love letter and a parody of contemporary virtual reality culture.\" - J.H. Fearless, Creators <br />\n                        -->\n                            </p>",
+      "video": null,
+      "hidden": false
+    },
+    {
+      "title": "Moths",
+      "metadata": "2017 — Developer, SCRNPRNT",
+      "image": "/gif/moths.gif",
+      "description": "A moth metamorphosis.",
+      "links": [
+        {
+          "label": "Play",
+          "href": "https://neilson.itch.io/moths"
+        }
+      ],
+      "details": "",
+      "video": "https://www.youtube.com/embed/4_GrVOIp8As?rel=0",
+      "hidden": true
+    },
+    {
+      "title": "Irrational Exuberance",
+      "metadata": "2016 — Interactive Design, Buffalo Vision",
+      "image": "/gif/irrex.gif",
+      "description": "A surreal exploration through the far reaches of space.",
+      "links": [
+        {
+          "label": "Website",
+          "href": "http://buffalovisiongames.com/irrex/"
+        },
+        {
+          "label": "Steam",
+          "href": "http://store.steampowered.com/app/343730/"
+        }
+      ],
+      "details": "<p>\n\n                                <b>Sundance New Frontiers 2015</b> - Official Selection<br>\n                                <b>TIFF 2016</b> - Official Selection<br>\n                                <b>IndieCade 2016</b> - Official Selection<br>\n\n                            </p>",
+      "video": null,
+      "hidden": true
+    },
+    {
+      "title": "Flywrench",
+      "metadata": "2015 — Lead Level Designer, Messhof",
+      "image": "/gif/flywrench.gif",
+      "description": "A frenetic action game about piloting an aerobatic ship through the depths of space.",
+      "links": [
+        {
+          "label": "Website",
+          "href": "http://www.flywrench.com/"
+        },
+        {
+          "label": "Steam",
+          "href": "http://store.steampowered.com/app/337350/"
+        }
+      ],
+      "details": "<p>\n                                A MAZE. 2015 - <a href=\"https://amazestuff.tumblr.com/post/114574285919/a-mazeawards-2015-and-the-nominees-are-press\" target=\"_blank\">Nominee</a><br>\n                                UCLA Game Arts Festival 2015 - <a href=\"http://festival.games.ucla.edu/2015/\" target=\"_blank\">Official Selection</a><br>\n                            </p>",
+      "video": null,
+      "hidden": false
+    }
+  ],
+  "about": "\n                <p>\n                    Neilson Koerner-Safrata is a video game designer and software developer. Known for his work in interaction design.\n                </p>\n                \n                <p>\n                    He lives in San Francisco, works at the spatial intelligence company <a href=\"https://worldlabs.ai/\" target=\"_blank\" rel=\"noopener noreferrer\">World Labs</a>, and maintains the <a href=\"https://oakwood-studio.github.io/\" target=\"_blank\" rel=\"noopener noreferrer\">Oakwood St.</a> studio.\n                </p>\n                \n                <p>\n                    As the first designer at <a href=\"https://tenderclaws.com/\" target=\"_blank\" rel=\"noopener noreferrer\">Tender Claws</a>, Neilson developed the games Virtual Virtual Reality and Tendar, combining emerging tech with theatrical arts and game design. Afterwards, he co-founded <a href=\"https://scrnprnt.ca/\" target=\"_blank\" rel=\"noopener noreferrer\">SCRNPRNT</a> with his twin brother <a href=\"https://milanks.net/\" target=\"_blank\" rel=\"noopener noreferrer\">Milan</a>. Their video games included an online chatroom for the animal civilizations of Age of Empires II, a memorial to the last Counter-Strike server, and an interactive listening experience with musician Sam Tudor. \n                    \n                </p>\n                \n                <p>\n                    He then moved to the Bay Area, creating animation systems for an interactive talking dog driven by realtime language models.\n                </p>\n                \n                <p>\n                    In the past, Neilson has contributed to The Terraforming design program, researching the connection between space travel and death, and has been active in the communities of ZSpace, DWeb, Trust, Autonomous Worlds, South Park Commons, and Stochastic Labs.\n                </p>\n\n            ",
+  "shelves": [
+    {
+      "year": "2025",
+      "books": [
+        {
+          "title": "Techgnosis",
+          "author": "Erik Davis",
+          "image": "/reading/2025/techgnosis.jpg",
+          "description": "Antidote to save your loved ones from techno-Manicheanism, written with a grin and a wink.",
+          "quotes": [
+            "\"Technology is a trickster, and it has been\n                    so since the first culture hero taught the human tribe how to\n                    spin wool before he pulled it over our eyes.\""
+          ],
+          "featured": true
+        },
+        {
+          "title": "A Scanner Darkly",
+          "author": "Philip K. Dick",
+          "image": "/reading/2025/ascannerdarkly.jpg",
+          "description": "A science fiction of the soul from the manual on paranoia, drug addiction, and defilement.",
+          "quotes": [
+            "\"Any given man sees only a tiny portion of the total truth, and very\n                    often, in fact almost [...] perpetually, he deliberately deceives himself about that little\n                    precious fragment as well.\""
+          ],
+          "featured": true
+        },
+        {
+          "title": "The Rings of Saturn",
+          "author": "W. G. Sebald",
+          "image": "/reading/2025/ringsofsaturn.jpg",
+          "description": "The benefits and pleasures of a Lindy walk in book form, sounds like the soft putt-putt of a mind ready to lay to rest.",
+          "quotes": [
+            "\"No clear picture emerged. Neither then nor today.\"",
+            "\"In a grain of sand in the hem of Emma Bovary's winter gown [...] Flaubert saw the whole of the Sahara.\""
+          ],
+          "featured": true
+        },
+        {
+          "title": "Savage Detectives",
+          "author": "Roberto Bolaño",
+          "image": "/reading/2025/savagedetectives.jpg",
+          "description": "One to come back to again and again, vast and violent.",
+          "quotes": [
+            "\"December 23: Nothing happened today. And if anything did, I'd rather not talk about it, because I didn't understand it.\""
+          ],
+          "featured": true
+        },
+        {
+          "title": "Warfighting",
+          "author": "Alfred M. Gray",
+          "image": "/reading/2025/warfighting.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "The Maniac",
+          "author": "Benjamín Labatut",
+          "image": "/reading/2025/themaniac.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Storm of Steel",
+          "author": "Ernst Jünger",
+          "image": "/reading/2025/stormofsteel.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Demian",
+          "author": "Hermann Hesse",
+          "image": "/reading/2025/demian.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "The Art of Contemplation",
+          "author": "Richard Rudd",
+          "image": "/reading/2025/artofcontemplation.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Catching the Big Fish",
+          "author": "David Lynch",
+          "image": "/reading/2025/catchingthebigfish.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Wherever You Go, There You Are",
+          "author": "Jon Kabat-Zinn",
+          "image": "/reading/2025/whereveryougo.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Andrey Tarkovsky",
+          "author": "Andrey Tarkovsky",
+          "image": "/reading/2025/andreytarkovsky.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Six Memos for the Next Millennium",
+          "author": "Italo Calvino",
+          "image": "/reading/2025/sixmemos.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "My First Summer in the Sierra",
+          "author": "John Muir",
+          "image": "/reading/2025/firstsummerinthesierra.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        }
+      ]
+    },
+    {
+      "year": "2024",
+      "books": [
+        {
+          "title": "What is Life?",
+          "author": "Blaise Agüera y Arcas",
+          "image": "/reading/2024/whatislife.png",
+          "description": "From the black smoker to the black mirror, an excerpt from a forthcoming book that connects biology\n                    and computation.",
+          "quotes": [
+            "\"Retroviruses are unsettingly ... intimate. HIV specifically targets immune cells, but\n                    if a retrovirus infects an egg or sperm cell, it can insert its code into an organism's germ line,\n                    becoming a permanent part not only of that cell, but of an entire species.\"",
+            "\"Perhaps, when it kills, such a virus is doing its job: wiping out rivals who have\n                    invaded the original host's territory. [...] Outside our bodies, 'our' viruses could be similarly\n                    seeking out and destroying whole animals who are recognized as 'not-us'.\""
+          ],
+          "featured": true
+        },
+        {
+          "title": "Accelerando",
+          "author": "Charles Stross",
+          "image": "/reading/2024/accelerando.jpg",
+          "description": "Funny, sheer mass of quality ideas on every page, relevant, and a great first introduction to Stross.",
+          "quotes": [
+            "\"As a demonstration they mean business, two \"software engineers\" in California have\n                    been kneecapped, tarred, feathered, and left for dead under placards accusing them of\n                    reverse-engineering movie plot lines using avatars of dead and out-of-copyright stars.\"",
+            "\"If you are remembering this presentation, you are probably <i>resimulated</i>. This is\n                    not the same as being <i>resurrected</i>. [...] (Exception: If you died after the\n                    <i>singularity</i>, you may be a genuine <i>resurrectee</i>. In which case, why are you reading this\n                    FAQ?)\"",
+            "\"A weakly godlike intelligence is not a supernatural agency but the product of a highly\n                    advanced society that learned how to artificially create souls [late twentieth century: software]\""
+          ],
+          "featured": true
+        },
+        {
+          "title": "The Beauty of Games",
+          "author": "Frank Lantz",
+          "image": "/reading/2024/beautyofgames.jpg",
+          "description": "Whenever Frank talks about games I get excited about them all over again.",
+          "quotes": [
+            "\"We ignore the ambiguity of the physical position of the Chess piece in order to access a higher level of ambiguity. The beauty of Chess is not knowing where you are, but <b>not</b> knowing where you are. [...] When a Chess player is suspended in hypnotic rapture above the board, she isn't\n                    appreciating the clear, straight lines of pure logic, she is deep inside this jungle, looking for a\n                    way out.\""
+          ],
+          "featured": true
+        },
+        {
+          "title": "There is No Antimemetics Division",
+          "author": "qntm",
+          "image": "/reading/2024/antimemetics.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "The Construction of Social Reality",
+          "author": "John R. Searle",
+          "image": "/reading/2024/constructionofsocialreality.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Dune Messiah",
+          "author": "Frank Herbert",
+          "image": "/reading/2024/messiah.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "The Pornographer's Poem",
+          "author": "Michael Turner",
+          "image": "/reading/2024/pornographerspoem.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Metagaming",
+          "author": "Stephanie Boluk and Patrick Lemieux",
+          "image": "/reading/2024/metagaming.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Creativity, Inc.",
+          "author": "Ed Catmull",
+          "image": "/reading/2024/creativityinc.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "The Illusion of Life",
+          "author": "Frank Thomas and Ollie Johnston",
+          "image": "/reading/2024/illusionoflife.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Sentience: The Invention of Consciousness",
+          "author": "Nicholas Humphrey",
+          "image": "/reading/2024/sentience.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "The Art of Gathering",
+          "author": "Priya Parker",
+          "image": "/reading/2024/artofgathering.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Benjamin Franklin: An American Life",
+          "author": "Walter Isaacson",
+          "image": "/reading/2024/benjaminfranklin.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Tripping on Utopia",
+          "author": "Benjamin Breen",
+          "image": "/reading/2024/trippingonutopia.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        }
+      ]
+    },
+    {
+      "year": "2023",
+      "books": [
+        {
+          "title": "The Dream Machine",
+          "author": "M. Mitchell Waldrop",
+          "image": "/reading/2023/dreamMachine.jpg",
+          "description": "The first history of computing book I have read, highly recommend. In depth descriptions of the\n                    conceptual underpinnings (information theory, cybernetics), and then rich history of decade after\n                    decade of research and development.",
+          "quotes": [],
+          "featured": true
+        },
+        {
+          "title": "The Brothers Karamazov",
+          "author": "Fyodor Dostoevsky",
+          "image": "/reading/2023/brothersKaramazov.jpg",
+          "description": "Worth reading for the Grand Inquisitor chapter. Meandering and slow, then\n                    dense explosive conversations, then slow again. Dmitri Karamazov is the classic Underground Man,\n                    mercurial, ruinous, yet all the same righteous.",
+          "quotes": [
+            "\"Here is perhaps the one man in the world whom you might leave alone without a penny,\n                    in the center of an unknown town of a million inhabitants, and he would not come to harm, he would\n                    not die of cold and hunger, for he would be fed and sheltered at once; and if he were not, he would\n                    find a shelter for himself, and it would cost him no effort or humiliation. And to shelter him would\n                    be no burden, but, on the contrary, would probably be looked on as a pleasure.\""
+          ],
+          "featured": true
+        },
+        {
+          "title": "Fanged Noumena",
+          "author": "Nick Land",
+          "image": "/reading/2023/fangedNoumena.jpg",
+          "description": "Begins with art and beauty and ends in an electromagnetic shotgun to the head. So many relevant\n                    essays that are getting refiltered through AI &amp; e/acc.",
+          "quotes": [
+            "\"This is because what appears to humanity as the history of capitalism is an invasion\n                    from the future by an artificial intelligent space that must assemble itself entirely from its\n                    enemy's resources.\"",
+            "\"Only proto-capitalism has ever been critiqued.\"",
+            "\"Garbage time is running out. Can what is playing you make it to level-2?\""
+          ],
+          "featured": true
+        },
+        {
+          "title": "Near to the Wild Heart",
+          "author": "Clarice Lispector",
+          "image": "/reading/2023/nearToTheWildHeart.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "American Prometheus",
+          "author": "Kai Bird and Martin J. Sherwin",
+          "image": "/reading/2023/oppenheimer.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Journey to the Edge of Reason",
+          "author": "Stephen Budiansky",
+          "image": "/reading/2023/edgeOfReason.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Solaris",
+          "author": "Stanisław Lem",
+          "image": "/reading/2023/solaris.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Zeros + Ones",
+          "author": "Sadie Plant",
+          "image": "/reading/2023/zerosAndOnes.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "When We Cease to Understand the World",
+          "author": "Benjamín Labatut",
+          "image": "/reading/2023/whenWeCease.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Carceral Capitalism",
+          "author": "Jackie Wang",
+          "image": "/reading/2023/carceralCapitalism.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Steve Jobs",
+          "author": "Walter Isaacson",
+          "image": "/reading/2023/steveJobs.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        }
+      ]
+    },
+    {
+      "year": "2022",
+      "books": [
+        {
+          "title": "Barney's Version",
+          "author": "Mordecai Richler",
+          "image": "/reading/2022/barneysVersion.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": true
+        },
+        {
+          "title": "Hopscotch",
+          "author": "Julio Cortázar",
+          "image": "/reading/2022/Hopscotch.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": true
+        },
+        {
+          "title": "Soie",
+          "author": "Alessandro Baricco",
+          "image": "/reading/2022/soie.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "2666",
+          "author": "Robert Bolaño",
+          "image": "/reading/2022/2666.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "The Sailor Who Fell from Grace with the Sea",
+          "author": "Yukio Mishima",
+          "image": "/reading/2022/sailorWhoFellFromGrace.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "The Dawn of Everything: A New History of Humanity",
+          "author": "David Graeber and David Wengrow",
+          "image": "/reading/2022/dawnOfEverything.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "The Grasshopper",
+          "author": "Bernard Suits",
+          "image": "/reading/2022/grasshopper.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Lolita",
+          "author": "Vladimir Nabokov",
+          "image": "/reading/2022/lolita.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Big Sur and the Oranges of Hieronymus Bosch",
+          "author": "Henry Miller",
+          "image": "/reading/2022/bigSur.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Dune",
+          "author": "Frank Herbert",
+          "image": "/reading/2022/dune.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "After Geoengineering",
+          "author": "Holly Buck",
+          "image": "/reading/2022/afterGeoengineering.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        }
+      ]
+    },
+    {
+      "year": "2021",
+      "books": [
+        {
+          "title": "The Terraforming",
+          "author": "Benjamin H. Bratton",
+          "image": "/reading/2021/TheTerraforming.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": true
+        },
+        {
+          "title": "Introduction to Comparative Planetology",
+          "author": "Lukáš Likavčan",
+          "image": "/reading/2021/IntroductionToComparitvePlanetology.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": true
+        },
+        {
+          "title": "Postcapitalist Desire",
+          "author": "Mark Fisher",
+          "image": "/reading/2021/PostcapitalistDesire.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": true
+        },
+        {
+          "title": "Accelerate",
+          "author": "Robin Mackay",
+          "image": "/reading/2021/Accelerate.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "The Snows of Venice",
+          "author": "Ben Lerner and Alexander Kluge",
+          "image": "/reading/2021/SnowsOfVenice.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Seeing Like a State",
+          "author": "James C. Scott",
+          "image": "/reading/2021/SeeingLikeAState.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Xenofeminism",
+          "author": "Helen Hester",
+          "image": "/reading/2021/Xenofeminism.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "The Story of the Eye",
+          "author": "Georges Bataille",
+          "image": "/reading/2021/StoryOfTheEye.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "X-Risk",
+          "author": "Thomas Moynihan",
+          "image": "/reading/2021/X-Risk.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Home Rule",
+          "author": "Nandita Sharma",
+          "image": "/reading/2021/HomeRule.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Gamer Theory",
+          "author": "McKenzie Wark",
+          "image": "/reading/2021/GamerTheory.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Finite and Infinite Games",
+          "author": "James P. Carse",
+          "image": "/reading/2021/FiniteAndInfiniteGames.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "The Apprenticeship of Duddy Kravitz",
+          "author": "Mordecai Richler",
+          "image": "/reading/2021/ApprenticeshipofDuddyKravitz.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        }
+      ]
+    },
+    {
+      "year": "2020",
+      "books": [
+        {
+          "title": "End Zone",
+          "author": "Don DeLillo",
+          "image": "/reading/2020/EndZone.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": true
+        },
+        {
+          "title": "White Noise",
+          "author": "Don DeLillo",
+          "image": "/reading/2020/whiteNoise.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": true
+        },
+        {
+          "title": "Pure War",
+          "author": "Paul Virilio",
+          "image": "/reading/2020/pureWar.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": true
+        },
+        {
+          "title": "Agua Viva",
+          "author": "Clarice Lispector",
+          "image": "/reading/2020/AguaViva.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Infinite Jest",
+          "author": "David Foster Wallace",
+          "image": "/reading/2020/InfiniteJest.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "The Glass Bead Game",
+          "author": "Hermann Hesse",
+          "image": "/reading/2020/GlassBeadGame.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Cat's Cradle",
+          "author": "Kurt Vonnegut",
+          "image": "/reading/2020/CatsCradle.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Confessions of a Mask",
+          "author": "Yukio Mishima",
+          "image": "/reading/2020/ConfessionsOfAMask.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Dialectic of Enlightenment",
+          "author": "Max Horkheimer and Theodor Adorno",
+          "image": "/reading/2020/DialecticOfEnlightment.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Do Androids Dream of Electric Sheep?",
+          "author": "Philip K. Dick",
+          "image": "/reading/2020/DoAndroidsDream.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Aesthetics and Politics",
+          "author": "Walter Benjamin et al.",
+          "image": "/reading/2020/AestheticsAndPolitics.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "The Information Bomb",
+          "author": "Paul Virilio",
+          "image": "/reading/2020/InformationBomb.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "The Master and Margarita",
+          "author": "Mikhail Bulgakov",
+          "image": "/reading/2020/MasterAndMargarita.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Against Interpretation",
+          "author": "Susan Sontag",
+          "image": "/reading/2020/AgainstInterpretation.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "As I Lay Dying",
+          "author": "William Faulkner",
+          "image": "/reading/2020/AsILayDying.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Six Memos for the Next Millennium",
+          "author": "Italo Calvino",
+          "image": "/reading/2020/SixMementos.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Technology and Empire",
+          "author": "George Grant",
+          "image": "/reading/2020/TechnologyAndEmpire.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Understanding Media",
+          "author": "Marshall McLuhan",
+          "image": "/reading/2020/UnderstandingMedia.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        }
+      ]
+    },
+    {
+      "year": "200X",
+      "books": [
+        {
+          "title": "Tales of the Floating Class",
+          "author": "Norman Klein",
+          "image": "/reading/Earlier/TalesOfTheFloatingClass.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": true
+        },
+        {
+          "title": "Duty Free Art",
+          "author": "Hito Steyerl",
+          "image": "/reading/Earlier/DutyFreeArt.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": true
+        },
+        {
+          "title": "Gravity's Rainbow",
+          "author": "Thomas Pynchon",
+          "image": "/reading/2021/GravitysRainbow.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": true
+        },
+        {
+          "title": "Forget Foucault",
+          "author": "Jean Baudrillard",
+          "image": "/reading/2020/forgetFoucault.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Capitalist Realism",
+          "author": "Mark Fisher",
+          "image": "/reading/Earlier/CapitalistRealism.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Blood Meridian",
+          "author": "Cormac McCarthy",
+          "image": "/reading/Earlier/BloodMeridian.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "The Crying of Lot 49",
+          "author": "Thomas Pynchon",
+          "image": "/reading/Earlier/CryingOfLot49.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Idoru",
+          "author": "William Gibson",
+          "image": "/reading/Earlier/Idoru.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "If on a Winter's Night a Traveler",
+          "author": "Italo Calvino",
+          "image": "/reading/Earlier/IfOnAWintersNight.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "The World of Yesterday",
+          "author": "Stefan Zweig",
+          "image": "/reading/Earlier/TheWorldOfYesterday.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Notes from Underground",
+          "author": "Fyodor Dostoevsky",
+          "image": "/reading/Earlier/NotesFromUnderground.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Invisible Cities",
+          "author": "Italo Calvino",
+          "image": "/reading/Earlier/InvisibleCities.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Neuromancer",
+          "author": "William Gibson",
+          "image": "/reading/Earlier/NeuroMancer.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        },
+        {
+          "title": "Roadside Picnic",
+          "author": "Arkady and Boris Strugatsky",
+          "image": "/reading/Earlier/RoadsidePicnic.jpg",
+          "description": "",
+          "quotes": [],
+          "featured": false
+        }
+      ]
+    }
+  ]
+}

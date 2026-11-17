@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script>
+    if (/^\/glass(?:\/|$)/.test(window.location.pathname)) document.documentElement.dataset.theme = 'glass';
+  </script>
+  <style>
+    html[data-theme="glass"] { background: #000; color-scheme: dark; }
+    html[data-theme="glass"] body, html[data-theme="glass"] #root { background: #000; }
+    html[data-theme="glass"] body { margin: 0; }
+  </style>
+  <meta name="description" content="Neilson Koerner-Safrata — video game designer and software developer working across interaction design and technology." />
+  <meta name="author" content="Neilson Koerner-Safrata" />
+  <meta property="og:title" content="Neilson Koerner-Safrata" />
+  <meta property="og:description" content="Neilson Koerner-Safrata — video game designer and software developer working across interaction design and technology." />
+  <meta property="og:url" content="https://neilsonks.com/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="https://neilsonks.com/images/Neilson_Meta.jpg" />
+  <meta property="og:image:width" content="720" />
+  <meta property="og:image:height" content="540" />
+  <meta property="og:image:alt" content="Neilson Koerner-Safrata" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:site" content="@neilsonks" />
+  <meta name="twitter:creator" content="@neilsonks" />
+  <meta name="twitter:title" content="Neilson Koerner-Safrata" />
+  <meta name="twitter:description" content="Neilson Koerner-Safrata — video game designer and software developer working across interaction design and technology." />
+  <meta name="twitter:image" content="https://neilsonks.com/images/Neilson_Meta.jpg" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://neilsonks.com/" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@200;300;400;600;700;800&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <title>Neilson</title>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+</html>

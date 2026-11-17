@@ -1,0 +1,67 @@
+{
+  "source": "https://data.sf.gov/d/ynuv-fyni",
+  "shoreline": "https://services.arcgis.com/Zs2aNLFN00jrS4gG/ArcGIS/rest/services/CPAs_WFL1/FeatureServer/7",
+  "retrieved": "2026-10-14",
+  "survey": "Pictometry 2010 / DataSF 2017 footprint refinement",
+  "license": "ODC PDDL",
+  "units": "1 scene unit = 100 metres",
+  "bounds": [
+    -66.94531184000198,
+    68.07349648000695,
+    -71.17079557720302,
+    70.41078722040226
+  ],
+  "full": {
+    "buildings": 176899,
+    "cells": 177241,
+    "side": 421,
+    "vertices": 3654292,
+    "triangles": 5075863,
+    "downloadBytes": 43064706,
+    "bounds": [
+      -66.94531184000198,
+      68.07349648000695,
+      -71.17079557720302,
+      70.41078722040226
+    ]
+  },
+  "downtown": {
+    "buildings": 5592,
+    "cells": 5625,
+    "side": 75,
+    "vertices": 120902,
+    "triangles": 167696,
+    "downloadBytes": 1439769,
+    "bounds": [
+      19.655004160002818,
+      46.4151670400031,
+      -42.97763188839758,
+      -6.709952150001709
+    ]
+  },
+  "market": {
+    "buildings": 256,
+    "cells": 256,
+    "side": 16,
+    "vertices": 5906,
+    "triangles": 8273,
+    "downloadBytes": 70574,
+    "bounds": [
+      23.349297839999963,
+      31.142473120002023,
+      -24.3338128351984,
+      -16.078886027602486
+    ],
+    "mapping": {
+      "method": "minimum squared centre travel",
+      "baselineSquaredTravel": 814.1518765802145,
+      "squaredTravel": 788.8697496727888,
+      "rmsTravelMeters": 175.54265748413778
+    }
+  },
+  "ignored": 124,
+  "multipart": 94,
+  "filledCourtyards": 3938,
+  "fallbackHeights": 0,
+  "notes": "Exterior footprints simplified at 0.8 m. Courtyards filled. Ground surface interpolated from building ground elevations; parks are approximate. Historic snapshot; no procedural buildings or contemporary landmark substitutions."
+}
