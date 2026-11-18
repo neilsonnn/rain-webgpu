@@ -212,11 +212,11 @@ export function createRainPlants(plants: readonly PlantBody[], bindings: readonl
     for (const attribute of attributes) attribute.needsUpdate = true
   }
   function settled() {
+    const atRest = (axis: Spring) => Math.abs(axis.position) < 1e-5 && Math.abs(axis.velocity) < 1e-5
     for (const blade of blades) {
-      if (blade.retained >= 1e-8 || Math.abs(blade.pitch.velocity) >= 1e-5
-        || Math.abs(blade.twist.velocity) >= 1e-5 || Math.abs(blade.roll.velocity) >= 1e-5) return false
+      if (blade.retained >= 1e-8 || !atRest(blade.pitch) || !atRest(blade.twist) || !atRest(blade.roll)) return false
     }
-    return true
+    return branches.every(branch => atRest(branch.x) && atRest(branch.y) && atRest(branch.z))
   }
   return { texture: scaffold.texture, branchIndex: scaffold.indexOf, dispose: scaffold.dispose,
     blades, branches, colliders, intersect, impact, step, upload, settled, get hitCount() { return totalHits } }

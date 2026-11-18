@@ -43,7 +43,7 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
   renderer.domElement.setAttribute('aria-hidden', 'true')
   host.appendChild(renderer.domElement)
 
-  const garden = new Scene(), surface = new Scene(), frontRain = new Scene(), backRain = new Scene()
+  const garden = new Scene(), surface = new Scene(), frontRain = new Scene()
   garden.background = new Color(composition.background)
   const camera = new PerspectiveCamera(48, 1, .05, 60)
   const gardenCamera = camera.clone()
@@ -102,7 +102,7 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
     if (rain.backend !== 'starting') options.onRainBackend?.(rain.backend)
     invalidate()
   }, options.timings, { adapter: options.gpuAdapter, terrain: {texture:relief,grid:wire.surfaceGrid}, onFailure: message => { waterTouch.suspend(); failure(message) } })
-  frontRain.add(rain.front); backRain.add(rain.mesh)
+  frontRain.add(rain.front); garden.add(rain.mesh)
   glass.uniforms.uRainWater.value = rain.surface.texture
   glass.uniforms.uRainBounds.value.copy(rain.surface.bounds)
   glass.uniforms.uRainTexel.value = rain.surface.texel
@@ -117,16 +117,15 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
   let environment: WebGLRenderTarget | undefined
   let stopped = false, disposed = false, ready = false, frame = 0, time = 12, previous = 0
   let suspended = Boolean(options.suspended)
-  let ratio = Math.min(window.devicePixelRatio || 1, 1.65)
-  let slowFrames = 0, observedFrames = 0, lastWidth = 1, lastHeight = 1
+  let lastWidth = 1, lastHeight = 1
   let savedSettings = settings.current
   const pointer = new Vector2(), smoothPointer = new Vector2(), drawingSize = new Vector2(), look = new Vector3()
   const failure = (message: string) => { stopped = true; cancelAnimationFrame(frame); onFailure(message) }
-  const drawRain = (scene: Scene, view: PerspectiveCamera) => {
-    if (!(scene === frontRain ? rain.front.visible : rain.mesh.visible)) return
+  const drawFrontRain = () => {
+    if (!rain.front.visible) return
     const clear = renderer.autoClear, shadows = renderer.shadowMap.autoUpdate
     renderer.autoClear = false; renderer.shadowMap.autoUpdate = false
-    try { renderer.render(scene, view) }
+    try { renderer.render(frontRain, camera) }
     finally { renderer.autoClear = clear; renderer.shadowMap.autoUpdate = shadows }
   }
   renderer.debug.onShaderError = (context, program, vertex, fragment) => {
@@ -137,8 +136,7 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
     if (suspended) return
     const { width, height } = host.getBoundingClientRect()
     lastWidth = Math.max(1, width); lastHeight = Math.max(1, height)
-    const budget = Math.sqrt(2400000 / (lastWidth * lastHeight))
-    renderer.setPixelRatio(Math.min(ratio, budget))
+    renderer.setPixelRatio(window.devicePixelRatio || 1)
     renderer.setSize(lastWidth, lastHeight, false)
     renderer.getDrawingBufferSize(drawingSize)
     target.setSize(drawingSize.x, drawingSize.y)
@@ -151,12 +149,14 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
     // Preserve the composition's width on narrow screens without stretching it.
     camera.fov = Math.atan(Math.tan(24 * Math.PI / 180) / Math.min(1, camera.aspect)) * 360 / Math.PI
     camera.updateProjectionMatrix()
-    glass.uniforms.uGlassProjection.value.copy(camera.projectionMatrix)
   }
   const renderTimer = createRenderTimer(renderer, options.timings)
+  const glassTimer = createRenderTimer(renderer, options.timings, 'glassGpu')
+  let sampleGlass = false
   const draw = (now: number) => {
     frame = 0
     if (disposed || stopped || suspended || document.hidden) { previous = 0; return }
+    if (renderer.getPixelRatio() !== (window.devicePixelRatio || 1)) resize()
     const s = settings.current, elapsed = previous ? (now - previous) / 1000 : 0
     if (s !== savedSettings) { if (!options.standalone) saveGlassSettings(s); savedSettings = s }
     previous = now
@@ -191,6 +191,8 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
     gardenCamera.updateProjectionMatrix()
     glass.uniforms.uGlassView.value.copy(camera.matrixWorldInverse)
     glass.uniforms.uGardenProjection.value.copy(gardenCamera.projectionMatrix)
+    glass.uniforms.uGlassViewProjection.value.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
+    glass.uniforms.uGardenViewProjection.value.multiplyMatrices(gardenCamera.projectionMatrix, camera.matrixWorldInverse)
     foliage.uniforms.uRainSheen.value = s.rainWetness
     glass.uniforms.uRainWetness.value = rain.wetness
     // A passing shower softens direct sun without changing the saved grade.
@@ -224,7 +226,11 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
     lights.fill.intensity = composition.fill * (s.glass ? interfaceTransmission ** 2 * Math.exp(-1.02 * s.thickness) : 1)
     grading.update(s)
     renderer.toneMappingExposure = s.exposure
-    if (detailed) renderTimer.begin(now)
+    if (detailed) {
+      if (!s.glass && options.timings) options.timings.glassGpu = undefined
+      sampleGlass = s.glass && !sampleGlass
+      if (!sampleGlass) renderTimer.begin(now)
+    }
     const renderStart = detailed ? performance.now() : 0
     try {
       rain.renderWater()
@@ -233,14 +239,11 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
       if (s.glass) {
         // Keep full geometric wire shadows while excluding its surface from the
         // garden color/depth. Its optical depth must not share the foliage blur.
-        wire.writeSurface(false)
         renderer.setRenderTarget(target)
         renderer.render(garden, gardenCamera)
-        drawRain(backRain, gardenCamera)
         const background = garden.background
         try {
           if (s.embeddedMesh) {
-            wire.writeSurface(true)
             camera.layers.set(1)
             garden.background = null
             renderer.setClearColor(0x000000, 0)
@@ -249,7 +252,6 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
             renderer.render(garden, camera)
           }
         } finally {
-          wire.writeSurface(false)
           camera.layers.set(0)
           garden.background = background
           renderer.setClearColor(composition.background, 1)
@@ -262,17 +264,19 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
           wire.group.visible = false
           renderer.shadowMap.autoUpdate = false
           renderer.render(garden, camera)
-          drawRain(backRain, camera)
           renderer.autoClear = false
-          try { renderer.render(surface, camera) }
-          finally { renderer.autoClear = true; renderer.shadowMap.autoUpdate = true; wire.group.visible = s.embeddedMesh }
-        } else renderer.render(surface, camera)
+        }
+        if (detailed && sampleGlass) glassTimer.begin(now)
+        try { renderer.render(surface, camera) }
+        finally {
+          glassTimer.end()
+          renderer.autoClear = true; renderer.shadowMap.autoUpdate = true; wire.group.visible = s.embeddedMesh
+        }
       } else {
         renderer.setRenderTarget(composite)
         renderer.render(garden, camera)
-        drawRain(backRain, camera)
       }
-      drawRain(frontRain, camera)
+      drawFrontRain()
       renderer.setRenderTarget(null)
       grading.render(renderer)
     } catch (reason) {
@@ -283,13 +287,6 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
     } finally { renderTimer.end() }
     options.timings?.record(elapsed, simulationMs, detailed ? performance.now() - renderStart : 0)
     if (!stopped && !ready && rain.surface.ready) { ready = true; onReady() }
-    if (s.playing && elapsed > 0 && observedFrames < 180) {
-      observedFrames++
-      if (elapsed > .034) slowFrames++
-      if (observedFrames === 180 && slowFrames > 90 && ratio > .75) {
-        ratio = Math.max(.75, ratio * .75); resize()
-      }
-    }
     if (s.playing && !stopped) invalidate()
     else previous = 0
   }
@@ -331,7 +328,7 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
   }, options.onWaterFlow)
   const dispose = () => {
     if (disposed) return
-    renderTimer.dispose()
+    renderTimer.dispose(); glassTimer.dispose()
     disposed = true; stopped = true; cancelAnimationFrame(frame)
     if (!options.standalone) saveGlassSettings(settings.current)
     observer.disconnect()

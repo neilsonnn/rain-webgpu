@@ -31,6 +31,7 @@ export function createStorm(renderer: WebGLRenderer, plants: ReturnType<typeof c
   let gpu: Awaited<ReturnType<typeof createGpuStorm>> | undefined
   let curtain: ReturnType<typeof createRainCurtain> | undefined
   let started = false, disposed = false, failed = false, strength = 0, wetUntil = 0, clock = 12
+  let plantsMoving = false, nextSettleCheck = 0
   // Keep taps during asynchronous GPU startup, including on a dry, paused pane.
   const strokes = Array.from({ length: 48 }, () => ({ ax: 0, ay: 0, bx: 0, by: 0, radius: 0, pressure: 0, dt: 0, hits: 0, push: false }))
   const point = new Vector3(), velocity = new Vector3()
@@ -88,7 +89,10 @@ export function createStorm(renderer: WebGLRenderer, plants: ReturnType<typeof c
       hit(index, point, velocity, diameter) {
         const settings = readSettings()
         if (disposed || !settings.playing) return
-        if (index < plants.blades.length) plants.impact(index, point, velocity, diameter, settings)
+        if (index < plants.blades.length) {
+          plantsMoving = true
+          plants.impact(index, point, velocity, diameter, settings)
+        }
         else hanging.hit(index - plants.blades.length, point, velocity, diameter)
       },
       pressure(energy, hits) { if (!disposed && readSettings().playing) shake.pressure(energy, hits) },
@@ -133,9 +137,15 @@ export function createStorm(renderer: WebGLRenderer, plants: ReturnType<typeof c
       if (strength > .0001) wetUntil = time + Math.max(40, settings.rainBeadLifetime + settings.rainDrying)
       hanging.update(dt, time, settings, strength, emitDrip)
       if (gpu) {
-        const steps = Math.max(1, Math.ceil(dt * 120)), h = dt / steps
-        for (let i = 0; i < steps; i++) plants.step(h, settings, strength, leafDrip, undefined, true)
-        plants.upload(); plants.colliders(time, settings.breeze, false)
+        if (plantsMoving && dt > 0) {
+          const steps = Math.ceil(dt * 120), substep = dt / steps
+          for (let step = 0; step < steps; step++) plants.step(substep, settings, strength, leafDrip, undefined, true)
+          plants.upload()
+          if (time >= nextSettleCheck) {
+            plantsMoving = !plants.settled()
+            nextSettleCheck = time + .25
+          }
+        }
         gpu.uniforms.uRainResolution.value.copy(uniforms.uRainResolution.value)
         gpu.update(dt, time, strength, settings)
       }

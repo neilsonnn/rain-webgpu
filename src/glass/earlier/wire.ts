@@ -89,6 +89,12 @@ export function createWireGrid(width = 8, height = width, centerY = 1.8) {
     const mesh = new InstancedMesh(geometry, materials.material, capacity)
     mesh.customDepthMaterial = materials.depth
     mesh.layers.enable(1)
+    let strandCount = 0
+    mesh.onBeforeRender = (_renderer, _scene, camera) => {
+      strandCount = mesh.count
+      if (!camera.layers.isEnabled(1)) mesh.count = 0
+    }
+    mesh.onAfterRender = () => { mesh.count = strandCount }
     mesh.castShadow = mesh.receiveShadow = true
     mesh.frustumCulled = false
     meshes.push(mesh); group.add(mesh)
@@ -124,11 +130,8 @@ export function createWireGrid(width = 8, height = width, centerY = 1.8) {
       mesh.count = count; mesh.instanceMatrix.needsUpdate = true
     }
   }
-  const writeSurface = (enabled: boolean) => {
-    materials.material.colorWrite = enabled; materials.material.depthWrite = enabled
-  }
   return {
-    group, materials, meshes, update, writeSurface, surfaceGrid,
+    group, materials, meshes, update, surfaceGrid,
     dispose() {
       meshes.forEach(mesh => { mesh.geometry.dispose(); mesh.dispose() })
       materials.material.dispose(); materials.depth.dispose()

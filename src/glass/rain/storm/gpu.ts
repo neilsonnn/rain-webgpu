@@ -2,11 +2,12 @@
 import { CanvasTexture, NearestFilter, NoColorSpace, Vector3 } from 'three'
 import type { Vector4, WebGLRenderer } from 'three'
 import type { GlassSettings } from '../../settings'
-import type { FrameTimings } from '../../performance'
+import { createRenderTimer, type FrameTimings } from '../../performance'
 import { panePatterRate } from '../settings'
 import type { RainSqualls } from '../squalls'
-import { stormBudget as b, stormCount, stormOffsets as o, stormAtlasHeight, filmSide } from './budget'
-import { stormComputeWGSL, stormPackWGSL } from './compute'
+import { stormBudget as b, stormCount, stormOffsets as o, stormAtlasHeight, filmSide, filmPixels, particlePixels } from './budget'
+import { stormComputeWGSL, stormPackWGSL, stormCompactWGSL } from './compute'
+import { StormPopulation } from './population'
 import { createStormRendering } from './render'
 import type { createStormColliders } from './colliders'
 import { requestWebGPUAdapter, WebGPUUnavailableError } from '../webgpu'
@@ -22,12 +23,17 @@ export async function createGpuStorm(renderer:WebGLRenderer,bounds:Vector4,colli
   const adapter=options.adapter ?? await requestWebGPUAdapter()
   const timestamps=Boolean(timings && adapter.features.has('timestamp-query'))
   const device=await adapter.requestDevice({requiredFeatures:timestamps?['timestamp-query']:[]}).catch(()=>{throw new WebGPUUnavailableError()}),canvas=document.createElement('canvas')
-  canvas.width=b.atlasWidth;canvas.height=stormAtlasHeight
+  canvas.width=b.atlasWidth;canvas.height=filmPixels/b.atlasWidth
   const context=canvas.getContext('webgpu');if(!context) { device.destroy();throw new WebGPUUnavailableError() }
   const format=navigator.gpu.getPreferredCanvasFormat(),resources:GPUBuffer[]=[]
   const buffer=(label:string,size:number,usage:GPUBufferUsageFlags)=>{const value=device.createBuffer({label,size,usage});resources.push(value);return value}
-  const texture=new CanvasTexture(canvas);texture.colorSpace=NoColorSpace;texture.flipY=false;texture.generateMipmaps=false
-  texture.minFilter=texture.magFilter=NearestFilter
+  const atlasTexture=()=>{
+    const value=new CanvasTexture(canvas);value.colorSpace=NoColorSpace;value.flipY=false;value.generateMipmaps=false
+    value.minFilter=value.magFilter=NearestFilter
+    return value
+  }
+  let texture=atlasTexture(), smallFrames=0, previousAir=0
+  const population=new StormPopulation(), importTimer=createRenderTimer(renderer,timings,'importGpu')
   const rendering=createStormRendering(texture,bounds),parameters=new Float32Array(128),commands=new Float32Array(b.commands*12),brushes=new Float32Array(64)
   let disposed=false,lost=false,commandCount=0,dripCount=0,brushHits=0,brushCount=0,quiet=Infinity
   let patterCarry=0,patterTotal=0
@@ -36,7 +42,7 @@ export async function createGpuStorm(renderer:WebGLRenderer,bounds:Vector4,colli
   let timer: { query: GPUQuerySet; resolve: GPUBuffer; readback: GPUBuffer; busy: boolean } | undefined
   let lastTiming = -Infinity
   let reliefTexture: GPUTexture | undefined
-  const dispose=()=>{if(disposed)return;disposed=true;timer?.query.destroy();rendering.dispose();texture.dispose();reliefTexture?.destroy();context.unconfigure();for(const value of resources)value.destroy();device.destroy()}
+  const dispose=()=>{if(disposed)return;disposed=true;timer?.query.destroy();importTimer.dispose();rendering.dispose();texture.dispose();reliefTexture?.destroy();context.unconfigure();for(const value of resources)value.destroy();device.destroy()}
   device.lost.then(()=>{if(!disposed){lost=true;options.onFailure?.(new Error('The WebGPU connection was lost. Please reload the scene.'))}})
   device.addEventListener('uncapturederror',event=>{if(!disposed){lost=true;options.onFailure?.(new Error(event.error.message))}})
   try {
@@ -45,6 +51,7 @@ export async function createGpuStorm(renderer:WebGLRenderer,bounds:Vector4,colli
     const storage=GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST
     const params=buffer('storm controls',512,GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST)
     const particles=buffer('rain spray beads rings and trails',stormCount*48,storage)
+    const visible=buffer('live storm draw indices',(4+stormCount-o.spray)*4,storage|GPUBufferUsage.COPY_SRC)
     const leaves=buffer('moving leaf and sculpture colliders',colliders.data.byteLength,storage)
     const heads=buffer('leaf spatial hash',colliders.heads.byteLength,storage)
     const hits=buffer('GPU impact queue',b.hits*48,storage)
@@ -56,23 +63,27 @@ export async function createGpuStorm(renderer:WebGLRenderer,bounds:Vector4,colli
     const paneMemory=buffer('bead path anchors and contact history',b.beads*48,storage)
     const paneIndex=buffer('pane neighbors, free slots and arriving water',paneArenaWords*4,storage)
     reliefTexture=uploadPaneRelief(device,options.terrain?.texture)
-    const readbacks=Array.from({length:3},(_,i)=>({buffer:buffer(`storm feedback ${i}`,64+b.feedback*48,GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ),busy:false}))
+    const readbacks=Array.from({length:3},(_,i)=>({buffer:buffer(`storm feedback ${i}`,80+b.feedback*48,GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ),busy:false}))
     const module=device.createShaderModule({label:'GPU storm physics',code:stormComputeWGSL})
     const packModule=device.createShaderModule({label:'storm vertex texture bridge',code:stormPackWGSL})
+    const compactModule=device.createShaderModule({label:'live storm records',code:stormCompactWGSL})
     const paneModule=device.createShaderModule({label:'continuous beads and collecting tracks',code:paneComputeWGSL})
-    for (const shader of [module,packModule,paneModule]) {
+    for (const shader of [module,packModule,paneModule,compactModule]) {
       const info=await shader.getCompilationInfo()
       const errors=info.messages.filter(message=>message.type==='error')
       if(errors.length)throw new Error(errors.map(message=>`${shader.label}:${message.lineNum}:${message.linePos}: ${message.message}`).join('\n'))
     }
-    const [advance,impacts,pack]=await Promise.all([
+    const [advance,impacts,pack,compact]=await Promise.all([
       device.createComputePipelineAsync({layout:'auto',compute:{module,entryPoint:'advance'}}),
       device.createComputePipelineAsync({layout:'auto',compute:{module,entryPoint:'impacts'}}),
       device.createRenderPipelineAsync({layout:'auto',vertex:{module:packModule,entryPoint:'vertex'},fragment:{module:packModule,entryPoint:'fragment',targets:[{format}]}}),
+      device.createComputePipelineAsync({layout:'auto',compute:{module:compactModule,entryPoint:'compact'}}),
     ])
     const buffers=[params,particles,leaves,heads,hits,counters,events,input,weather,landed,paneIndex]
-    const group=(pipeline:GPUComputePipeline|GPURenderPipeline,bindings:number[])=>device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:bindings.map(binding=>({binding,resource:{buffer:buffers[binding]}}))})
-    const advanceGroup=group(advance,[0,1,2,3,4,5,6,8,9]),impactGroup=group(impacts,[0,1,4,5,7,8,9,10]),packGroup=group(pack,[1,9])
+    const group=(pipeline:GPUComputePipeline|GPURenderPipeline,bindings:number[],table=buffers)=>device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:bindings.map(binding=>({binding,resource:{buffer:table[binding]}}))})
+    const advanceGroup=group(advance,[0,1,2,3,4,5,6,8,9]),impactGroup=group(impacts,[0,1,4,5,7,8,9,10])
+    const bridgeBuffers=buffers.slice();bridgeBuffers[2]=visible
+    const packGroup=group(pack,[0,1,2,9],bridgeBuffers),compactGroup=group(compact,[0,1,2],bridgeBuffers)
     const paneBuffers=[{binding:0,value:params},{binding:1,value:particles},{binding:2,value:paneMemory},
       {binding:3,value:paneIndex},{binding:6,value:counters},{binding:7,value:landed}]
     const paneLayout=device.createBindGroupLayout({entries:[
@@ -91,10 +102,12 @@ export async function createGpuStorm(renderer:WebGLRenderer,bounds:Vector4,colli
     const point=new Vector3(),velocity=new Vector3()
     function read(slot:typeof readbacks[number],patter:number,submittedAt:number) {
       slot.busy=true
+      const snapshot=population.snapshot()
       void slot.buffer.mapAsync(GPUMapMode.READ).then(()=>{
         if(disposed)return
         const start=timings?.expanded?performance.now():0
-        const mapped=slot.buffer.getMappedRange(),counts=new Uint32Array(mapped,0,16),data=new Float32Array(mapped,64)
+        const mapped=slot.buffer.getMappedRange(),counts=new Uint32Array(mapped,0,16),data=new Float32Array(mapped,80)
+        population.observe(snapshot,new Uint32Array(mapped,64,4))
         if(submittedAt>=0)timings?.paneTotals(counts[14],patter,submittedAt)
         feedback.pressure(counts[10]/100,counts[11])
         for(let i=0;i<Math.min(b.feedback,counts[1]);i++) {
@@ -106,7 +119,7 @@ export async function createGpuStorm(renderer:WebGLRenderer,bounds:Vector4,colli
       }).catch(error=>{if(!disposed){lost=true;options.onFailure?.(error instanceof Error ? error : new Error(String(error)))}})
         .finally(()=>{if(!disposed && slot.buffer.mapState==='mapped')slot.buffer.unmap();slot.busy=false})
     }
-    return { ...rendering,get lost(){return lost}, depositAtlas:texture, get depositFrame(){return depositFrame},
+    return { ...rendering,get lost(){return lost}, get depositAtlas(){return texture}, get depositFrame(){return depositFrame},
       stroke(ax:number,ay:number,bx:number,by:number,radius:number,pressure:number,dt:number) {
         const i=Math.min(brushCount,7),at=i*8
         if(brushCount<8){brushes[at]=ax;brushes[at+1]=ay;brushCount++}
@@ -134,9 +147,20 @@ export async function createGpuStorm(renderer:WebGLRenderer,bounds:Vector4,colli
         quiet=s.rain||commandCount||brushCount?0:quiet+dt
         if((dt<=0&&!brushCount&&!commandCount)||quiet>Math.max(45,s.rainBeadLifetime+s.rainDrying+5))return
         const active=strength<.0001 ? 0 : Math.round(b.rain*Math.min(1,(.004+.996*strength**1.8)*s.rainParticles))
-        rendering.uniforms.uStormActive.value=active;rendering.uniforms.uRainShutter.value=s.rainShutter/1000;rendering.uniforms.uRainVisibility.value=s.rainVisibility
+        const hasFlight=active>0 || dripCount>0 || population.bound(0)>0
+        if(!hasFlight && !previousAir && !commandCount && !s.rain && !population.bound(1) && !population.bound(2) && !population.bound(3)) {
+          rendering.setPopulation(0,0,0,0,0); brushCount=0
+          if(timings){timings.stormGpu=timings.packGpu=timings.importGpu=timings.atlasBytes=undefined}
+          return
+        }
+        const airWork=Math.ceil(Math.max(previousAir,active)/128)*128
+        const dripEnd=airWork+(population.bound(0)>0?b.spray:0)
+        const advanceWork=dripEnd+(population.bound(2)>0?b.rings:0)
+        const oldBeads=population.bound(1),oldTrails=population.bound(3)
+        if(dt>0)previousAir=active
+        rendering.uniforms.uRainShutter.value=s.rainShutter/1000;rendering.uniforms.uRainVisibility.value=s.rainVisibility
         rendering.uniforms.uPaneImpact.value.set(s.rainImpactDuration,s.rainImpactScale,s.rainBeadVelocity)
-        colliders.update()
+        if(hasFlight) colliders.update(time,s.breeze)
         parameters.set([Math.min(.05,dt),time,strength,active,s.rainWind,s.rainWindStrength,s.rainTurbulence,s.rainSpeed,
           s.rainDropSize,s.rainGlass,Number(s.glass),s.rainIncidence,
           bounds.x,bounds.x+bounds.z,bounds.y,bounds.y+bounds.w,
@@ -147,6 +171,19 @@ export async function createGpuStorm(renderer:WebGLRenderer,bounds:Vector4,colli
         patterCarry = s.rain && s.glass ? patterCarry + (panePatterRate(strength,s,bounds.z*bounds.w)*squalls.flux)*Math.min(.05,dt) : 0
         const patterCount = Math.floor(patterCarry)
         patterCarry -= patterCount
+        const contactLimit=brushHits+patterCount+(s.glass?Math.min(active,b.hits):0)
+        population.advance(dripCount,contactLimit,s.rainBeadChance>0)
+        const drips=population.bound(0), beads=population.bound(1), rings=population.bound(2), trails=population.bound(3)
+        parameters.set([airWork,dripEnd],117)
+        parameters.set([drips,beads,rings,trails],124)
+        rendering.setPopulation(active,drips,beads,rings,trails)
+        rendering.uniforms.uStormEnds.value.toArray(parameters,120)
+        const rows=Math.ceil((filmPixels+(active+drips+beads+rings+trails)*particlePixels)/b.atlasWidth)
+        const tier=Math.min(stormAtlasHeight,2**Math.ceil(Math.log2(rows)))
+        smallFrames=tier<canvas.height?smallFrames+1:0
+        if(tier>canvas.height || smallFrames>=30){
+          texture.dispose();canvas.height=tier;texture=atlasTexture();rendering.uniforms.uStormParticles.value=texture;smallFrames=0
+        }
         parameters.set([s.rainDrying,colliders.leafCount,patterCount,patterTotal % 16777216],96)
         parameters[100]=squalls.phase; parameters[101]=1.25/s.rainSquallSize
         parameters[102]=s.rainBeadChance; parameters[103]=s.rainBeadVelocity
@@ -158,7 +195,8 @@ export async function createGpuStorm(renderer:WebGLRenderer,bounds:Vector4,colli
         patterTotal += patterCount
         parameters.set(brushes,32)
         if(weatherRevision!==squalls.revision) { device.queue.writeBuffer(weather,0,squalls.cells); weatherRevision=squalls.revision }
-        device.queue.writeBuffer(params,0,parameters);device.queue.writeBuffer(leaves,0,colliders.data);device.queue.writeBuffer(heads,0,colliders.heads)
+        device.queue.writeBuffer(params,0,parameters)
+        if(hasFlight){device.queue.writeBuffer(leaves,0,colliders.data);device.queue.writeBuffer(heads,0,colliders.heads)}
         if(commandCount)device.queue.writeBuffer(input,0,commands.buffer,0,commandCount*48)
         const encoder=device.createCommandEncoder({label:'advance storm particles'})
         encoder.clearBuffer(landed)
@@ -169,9 +207,9 @@ export async function createGpuStorm(renderer:WebGLRenderer,bounds:Vector4,colli
         const timingClock = dt>0 && timestamps && timings?.expanded ? performance.now() : -Infinity
         const sample = Number.isFinite(timingClock) && !timer?.busy && timingClock - lastTiming >= 250
         if (sample && !timer) timer = {
-          query: device.createQuerySet({type:'timestamp',count:2}),
-          resolve: buffer('storm elapsed time',16,GPUBufferUsage.QUERY_RESOLVE|GPUBufferUsage.COPY_SRC),
-          readback: buffer('storm elapsed readback',16,GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ), busy: false,
+          query: device.createQuerySet({type:'timestamp',count:4}),
+          resolve: buffer('storm elapsed time',32,GPUBufferUsage.QUERY_RESOLVE|GPUBufferUsage.COPY_SRC),
+          readback: buffer('storm elapsed readback',32,GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ), busy: false,
         }
         const dispatch=(pipeline:GPUComputePipeline,bind:GPUBindGroup,n:number,writes?:GPUComputePassTimestampWrites)=>{
           const pass=encoder.beginComputePass(writes?{timestampWrites:writes}:undefined)
@@ -179,26 +217,37 @@ export async function createGpuStorm(renderer:WebGLRenderer,bounds:Vector4,colli
         }
         const timing = sample ? timer : undefined
         if (dt>0) {
-          dispatch(advance,advanceGroup,Math.ceil(o.trails/128),timing?{querySet:timing.query,beginningOfPassWriteIndex:0}:undefined)
+          dispatch(advance,advanceGroup,advanceWork/128,timing?{querySet:timing.query,beginningOfPassWriteIndex:0}:undefined)
         }
-        for(let i=0;i<panePasses.length;i++)dispatch(panePasses[i],paneGroup,Math.ceil((i<2?panePoolCount:b.beads)/128))
+        if(oldBeads || oldTrails)dispatch(panePasses[0],paneGroup,(oldTrails?panePoolCount:b.beads)/128)
+        if(oldBeads || (contactLimit && s.rainBeadChance>0)) {
+          dispatch(panePasses[1],paneGroup,(oldBeads?panePoolCount:b.beads)/128)
+          if(oldBeads)for(let i=2;i<panePasses.length;i++)dispatch(panePasses[i],paneGroup,b.beads/128)
+        }
         dispatch(impacts,impactGroup,Math.ceil((b.hits+commandCount+patterCount)/64))
-        dispatch(arrivals,paneGroup,Math.ceil(b.beads/128),timing?{querySet:timing.query,endOfPassWriteIndex:1}:undefined)
-        if (timing) {
-          encoder.resolveQuerySet(timing.query,0,2,timing.resolve,0)
-          encoder.copyBufferToBuffer(timing.resolve,0,timing.readback,0,16)
-        }
-        const output=encoder.beginRenderPass({colorAttachments:[{view:context.getCurrentTexture().createView(),clearValue:[0,0,0,1],loadOp:'clear',storeOp:'store'}]})
-        output.setPipeline(pack);output.setBindGroup(0,packGroup);output.draw(3);output.end()
+        if((oldBeads && contactLimit) || timing)dispatch(arrivals,paneGroup,oldBeads && contactLimit?b.beads/128:0,timing?{querySet:timing.query,endOfPassWriteIndex:1}:undefined)
+        encoder.clearBuffer(visible,0,16)
+        dispatch(compact,compactGroup,(stormCount-o.spray)/128,timing?{querySet:timing.query,beginningOfPassWriteIndex:2}:undefined)
+        const output=encoder.beginRenderPass({timestampWrites:timing?{querySet:timing.query,endOfPassWriteIndex:3}:undefined,colorAttachments:[{view:context.getCurrentTexture().createView(),clearValue:[0,0,0,1],loadOp:'clear',storeOp:'store'}]})
+        output.setScissorRect(0,0,b.atlasWidth,rows);output.setPipeline(pack);output.setBindGroup(0,packGroup);output.draw(3);output.end()
+        if(timing){encoder.resolveQuerySet(timing.query,0,4,timing.resolve,0);encoder.copyBufferToBuffer(timing.resolve,0,timing.readback,0,32)}
         const slot=readbacks.find(value=>!value.busy)
-        if(slot){encoder.copyBufferToBuffer(counters,0,slot.buffer,0,64);encoder.copyBufferToBuffer(events,0,slot.buffer,64,b.feedback*48)}
-        device.queue.submit([encoder.finish()]);texture.needsUpdate=true;renderer.initTexture(texture);depositFrame++
+        if(slot){encoder.copyBufferToBuffer(counters,0,slot.buffer,0,64);encoder.copyBufferToBuffer(visible,0,slot.buffer,64,16);encoder.copyBufferToBuffer(events,0,slot.buffer,80,b.feedback*48)}
+        device.queue.submit([encoder.finish()]);texture.needsUpdate=true
+        const importStart=timings?.expanded?performance.now():undefined
+        if(importStart!==undefined)importTimer.begin(importStart)
+        try{renderer.initTexture(texture)}finally{
+          importTimer.end()
+          if(importStart!==undefined)timings?.addImportTime(performance.now()-importStart,canvas.width*canvas.height*4)
+        }
+        depositFrame++
         if (timing) {
           timing.busy=true; lastTiming=timingClock
           void timing.readback.mapAsync(GPUMapMode.READ).then(()=>{
             if(disposed || !timings?.expanded)return
             const pair=new BigUint64Array(timing.readback.getMappedRange())
             if(pair[1]>=pair[0])timings.stormGpu=Number(pair[1]-pair[0])/1e6
+            if(pair[3]>=pair[2])timings.packGpu=Number(pair[3]-pair[2])/1e6
           }).catch(()=>{}).finally(()=>{
             if(!disposed && timing.readback.mapState==='mapped')timing.readback.unmap()
             timing.busy=false

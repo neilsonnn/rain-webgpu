@@ -6,6 +6,11 @@ interface FrameSample {
   simulation: number
   render: number
   renderGpu?: number
+  glassGpu?: number
+  packGpu?: number
+  importGpu?: number
+  importCpu?: number
+  atlasBytes?: number
   stormGpu?: number
   flightHits?: number
   patterHits?: number
@@ -17,6 +22,11 @@ export class FrameTimings {
   expanded = false
   private fineHits = 0
   renderGpu?: number
+  glassGpu?: number
+  packGpu?: number
+  importGpu?: number
+  atlasBytes?: number
+  private importCpu = 0
   stormGpu?: number
   private listeners = new Set<() => void>()
   private sample: FrameSample = { fps: 0, frame: 0, simulation: 0, render: 0 }
@@ -36,6 +46,7 @@ export class FrameTimings {
   }
   snapshot = () => this.sample
   addFeedbackTime(ms: number) { this.simulation += ms }
+  addImportTime(ms: number, bytes: number) { this.importCpu += ms; this.atlasBytes = bytes }
   addFineHits(count: number) { this.fineHits += count }
   paneTotals(flight: number, patter: number, now: number) {
     if (!this.expanded || now <= this.rainAt) return
@@ -49,7 +60,8 @@ export class FrameTimings {
   }
   reset() {
     this.frames = this.elapsed = this.simulation = this.render = 0
-    this.renderGpu = this.stormGpu = undefined
+    this.importCpu = 0; this.atlasBytes = undefined
+    this.renderGpu = this.glassGpu = this.packGpu = this.importGpu = this.stormGpu = undefined
     this.rainAt = -1; this.flightHits = this.patterHits = undefined
     this.fineHits = 0
     this.sample = { fps: 0, frame: 0, simulation: 0, render: 0 }
@@ -66,15 +78,17 @@ export class FrameTimings {
       fps: Math.round(this.frames / this.elapsed), frame: this.elapsed * 1000 / this.frames,
       simulation: this.simulation / this.frames, render: this.render / this.frames,
       renderGpu: this.renderGpu, stormGpu: this.stormGpu, flightHits: this.flightHits,
+      glassGpu: this.glassGpu, packGpu: this.packGpu, importGpu: this.importGpu,
+      importCpu: this.atlasBytes === undefined ? undefined : this.importCpu / this.frames, atlasBytes: this.atlasBytes,
       patterHits: this.patterHits === undefined ? undefined : this.patterHits + Math.round(this.fineHits / this.elapsed),
     }
-    this.frames = this.elapsed = this.simulation = this.render = this.fineHits = 0
+    this.frames = this.elapsed = this.simulation = this.render = this.fineHits = this.importCpu = 0
     this.listeners.forEach(listener => listener())
   }
 }
 
 // One reusable timer query. Never wait on the GPU or read an unfinished query.
-export function createRenderTimer(renderer: WebGLRenderer, timings?: FrameTimings) {
+export function createRenderTimer(renderer: WebGLRenderer, timings?: FrameTimings, field: 'glassGpu' | 'importGpu' | 'renderGpu' = 'renderGpu') {
   const gl = renderer.getContext() as WebGL2RenderingContext
   let ext: { TIME_ELAPSED_EXT: number; GPU_DISJOINT_EXT: number } | null | undefined
   let query: WebGLQuery | null = null, pending = false, measuring = false, last = -Infinity
@@ -85,12 +99,12 @@ export function createRenderTimer(renderer: WebGLRenderer, timings?: FrameTiming
       if (!ext) return
       if (gl.getParameter(ext.GPU_DISJOINT_EXT)) {
         if (query) gl.deleteQuery(query)
-        query = null; pending = false; timings.renderGpu = undefined
+        query = null; pending = false; timings[field] = undefined
         return
       }
       if (pending && query) {
         if (!gl.getQueryParameter(query, gl.QUERY_RESULT_AVAILABLE)) return
-        timings.renderGpu = gl.getQueryParameter(query, gl.QUERY_RESULT) / 1e6
+        timings[field] = gl.getQueryParameter(query, gl.QUERY_RESULT) / 1e6
         pending = false
       }
       if (now - last < 250) return

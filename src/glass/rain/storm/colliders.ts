@@ -19,7 +19,8 @@ export function createStormColliders(plants:ReturnType<typeof createRainPlants>,
     maximum.x=Math.max(maximum.x,p.x+r);maximum.y=Math.max(maximum.y,p.y+r);maximum.z=Math.max(maximum.z,p.z+r);largest=Math.max(largest,r)
   }
   return { data,heads,count,leafCount:plants.blades.length,minimum,maximum,get largest() { return largest },
-    update() {
+    update(time: number, breeze: number) {
+      plants.colliders(time, breeze, false)
       heads.fill(-1);minimum.set(Infinity,Infinity,Infinity);maximum.set(-Infinity,-Infinity,-Infinity);largest=0
       plants.blades.forEach((b,i)=>put(i,b.center,b.normal,b.across,b.along,b.binding.leaf.length*b.binding.leaf.width*.36,b.binding.leaf.length*.49))
       extras.forEach((e,i)=>put(plants.blades.length+i,e.center,e.normal,e.across,e.along,e.width,e.height))

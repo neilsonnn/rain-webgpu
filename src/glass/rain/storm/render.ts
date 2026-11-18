@@ -4,14 +4,15 @@ import type { Texture, WebGLRenderer } from 'three'
 import { rainExposureGLSL, rainFragmentGLSL } from '../shaders'
 import { waterFragmentGLSL } from '../surface'
 import { impactMotionGLSL } from '../impact'
-import { stormBudget as b, stormOffsets as o, stormCount, stormAtlasHeight } from './budget'
+import { stormBudget as b, stormOffsets as o, stormCount, filmPixels, particlePixels } from './budget'
 
 const decodeGLSL = /* glsl */`
 attribute float stormIndex;
 uniform sampler2D uStormParticles;
-uniform float uStormActive;
+uniform vec4 uStormEnds;
+uniform int uStormBase;
 vec4 dataAt(int offset) {
-  int at=int(stormIndex)*10+offset;
+  int at=${filmPixels}+(uStormBase+int(stormIndex))*${particlePixels}+offset;
   return texelFetch(uStormParticles,ivec2(at%${b.atlasWidth},at/${b.atlasWidth}),0);
 }
 float scalarAt(int i) { return dot(dataAt(i).rg,vec2(256.,1.))*(255./65535.); }
@@ -28,7 +29,6 @@ varying vec4 vRainShape;
 varying vec4 vRainDetail;
 varying vec3 vRainLight;
 void main() {
-  if (stormIndex<${b.rain}. && stormIndex>=uStormActive) { gl_Position=vec4(2.,2.,2.,1.); return; }
   float life=scalarAt(7)*600.;
   if (life<=.0001) { gl_Position=vec4(2.,2.,2.,1.); return; }
   vec4 p=positionAt();
@@ -41,7 +41,7 @@ void main() {
   vec2 along=normalize(projected+vec2(.00001,0.)), across=vec2(along.y,-along.x);
   float pixel=2.*max(.05,-center.z)/(projectionMatrix[1][1]*uRainResolution.y);
   float radius=p.w*.5, filtered=max(radius,pixel*.5), axial=max(radius,pixel*.5);
-  float isSpray=step(${o.spray}.,stormIndex);
+  float isSpray=step(uStormEnds.x,stormIndex);
   float shutter=min(min(uRainShutter,detail.y),mix(.026,.009,isSpray));
   float tail=rainTrailLength(center.xyz,velocity,projected,shutter,pixel,uRainResolution), halfLength=tail*.5+axial;
   vRainPoint=vec2(position.x*2.*filtered*1.12,position.y*2.*halfLength);
@@ -67,9 +67,9 @@ void main() {
   vec4 p=positionAt(); vec2 detail=pairAt(8)*vec2(1.,40.);
   float r=p.w, age=detail.y, angle=atan(v.y,v.x)-1.5707963;
   float height=r*.65, coverage=min(1.,v.w*.8), kind=0.; vec2 radii=vec2(r);
-  if (stormIndex>=${o.trails}.) {
+  if (stormIndex>=uStormEnds.w-uStormEnds.y) {
     radii=vec2(r,max(r,v.y)); angle=v.x; height=v.z*.001; kind=1.; coverage*=min(1.,height/.000035);
-  } else if (stormIndex>=${o.rings}.) {
+  } else if (stormIndex>=uStormEnds.z-uStormEnds.y) {
     vec2 incoming=v.xy*detail.x;
     vec2 travel=impactTravel(incoming,r,age);
     vWaterImpact=impactDimensions(r,age,incoming);
@@ -92,7 +92,7 @@ void main() {
 }
 `
 export function createStormRendering(texture: Texture, bounds: Vector4) {
-  const uniforms={ uStormParticles:{ value:texture },uStormActive:{ value:0 },
+  const uniforms={ uStormParticles:{ value:texture },uStormEnds:{ value:new Vector4() },uStormBase:{value:0},
     uRainResolution:{ value:new Vector2(1,1) },uPaneImpact:{value:new Vector3(.12,1.4,.14)},uRainShutter:{ value:.009 },uRainVisibility:{ value:1.2 },uStormBounds:{ value:bounds } }
   const quad=new PlaneGeometry(1,1)
   function geometry(start: number, count: number) {
@@ -100,20 +100,28 @@ export function createStormRendering(texture: Texture, bounds: Vector4) {
     const ids=new Float32Array(count); for(let i=0;i<count;i++) ids[i]=start+i
     g.setAttribute('stormIndex',new InstancedBufferAttribute(ids,1)); g.instanceCount=count; return g
   }
-  const rainGeometry=geometry(0,o.beads), surfaceGeometry=geometry(o.beads,stormCount-o.beads)
+  const rainGeometry=geometry(0,o.beads), surfaceGeometry=geometry(0,stormCount-o.beads)
+  const surfaceBase = { value:0 }
   const material=(side:number) => new ShaderMaterial({ vertexShader:particleVertex,
     fragmentShader:rainFragmentGLSL,
     uniforms:{ ...uniforms,uRainSide:{ value:side } },transparent:true,depthWrite:false,depthTest:true,toneMapped:false })
   const backMaterial=material(-1), frontMaterial=material(1)
   const mesh=new Mesh(rainGeometry,backMaterial), front=new Mesh(rainGeometry,frontMaterial)
   for(const m of [mesh,front]) { m.frustumCulled=false; m.renderOrder=3 }
-  const surfaceMaterial=new ShaderMaterial({ vertexShader:surfaceVertex,fragmentShader:waterFragmentGLSL,uniforms,
+  const surfaceMaterial=new ShaderMaterial({ vertexShader:surfaceVertex,fragmentShader:waterFragmentGLSL,uniforms:{...uniforms,uStormBase:surfaceBase},
     transparent:true,blending:AdditiveBlending,premultipliedAlpha:true,depthWrite:false,depthTest:false,toneMapped:false })
   const surfaceMesh=new Mesh(surfaceGeometry,surfaceMaterial); surfaceMesh.frustumCulled=false
   const scene=new Scene(), camera=new OrthographicCamera(-1,1,1,-1,0,1); scene.add(surfaceMesh)
   const target=new WebGLRenderTarget(1536,1536,{ type:HalfFloatType,minFilter:LinearFilter,magFilter:LinearFilter,depthBuffer:false })
   const clear=new Color()
-  return { mesh,front,uniforms,texture:target.texture,atlasHeight:stormAtlasHeight,
+  return { mesh,front,uniforms,texture:target.texture,
+    setPopulation(air:number, drips:number, beads:number, rings:number, trails:number) {
+      const airborne = air + drips
+      uniforms.uStormEnds.value.set(air, airborne, airborne + beads, airborne + beads + rings)
+      surfaceBase.value = airborne
+      rainGeometry.instanceCount = airborne
+      surfaceGeometry.instanceCount = beads + rings + trails
+    },
     renderWater(renderer:WebGLRenderer,drawDeposits?: (renderer:WebGLRenderer,bounds:Vector4)=>void) {
       const previous=renderer.getRenderTarget(), alpha=renderer.getClearAlpha(), auto=renderer.autoClear, shadows=renderer.shadowMap.autoUpdate
       renderer.getClearColor(clear)

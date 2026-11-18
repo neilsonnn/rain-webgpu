@@ -207,7 +207,7 @@ export default function Glass() {
       <CloudRainIcon size={15} /><span>Rain {settings.rain ? 'on' : 'off'}</span>
     </button>}
     </div>
-    <FrameCounter timings={timings} paused={!settings.playing || guideOpen} storm={version === 'earlier' && settings.rain ? stormBackend : undefined} />
+    <FrameCounter timings={timings} paused={!settings.playing || guideOpen} storm={version === 'earlier' ? stormBackend : undefined} />
     {panel && <div ref={panelRef} id="glass-settings" className="glass-settings" role="region" aria-label="Scene settings">
       <div className="glass-panel-heading"><span>{standalone ? 'Original · debug' : `${profile.label} study`}</span><button type="button" onClick={reset} title="Restore defaults and camera">{version === 'earlier' ? 'Reset study' : 'Match reference'}</button><button type="button" aria-label="Close debug panel" title="Close (Escape)" onClick={() => setPanel(false)}><XIcon size={16} /></button></div>
       <div className="glass-save-actions"><button type="button" disabled={saving} title="Save current scene defaults" onClick={() => void saveAsDefaults()}>{saving ? 'Saving…' : standalone ? 'Save page defaults' : 'Save as defaults'}</button>{standalone && <><button type="button" title="Download settings as JSON" onClick={exportSettings}>Export JSON</button><button type="button" title="Copy settings to clipboard" onClick={() => void copySettings()}>Copy JSON</button></>}</div>

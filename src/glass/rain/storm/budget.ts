@@ -21,6 +21,6 @@ export const paneArena = {
   incoming: paneGridCells * 2 + panePoolCount * 2 + stormBudget.trails * 2,
 }
 export const paneArenaWords = paneArena.incoming + stormBudget.beads * 4
-export const depositOffset = stormCount * 10
-// Keep data out of canvas alpha: browser premultiplication must never modify it.
-export const stormAtlasHeight = Math.ceil((depositOffset + filmSide * filmSide) / stormBudget.atlasWidth)
+export const filmPixels = filmSide * filmSide
+export const particlePixels = 10
+export const stormAtlasHeight = Math.ceil((stormCount * particlePixels + filmPixels) / stormBudget.atlasWidth)

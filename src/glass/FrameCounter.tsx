@@ -23,6 +23,12 @@ export function FrameCounter({ timings, paused, storm }: { timings: FrameTimings
         <dt>Render CPU</dt><dd>{measured ? ms(sample.render) : '—'}</dd>
         {storm === 'webgpu' && <><dt>Storm compute GPU</dt><dd>{measured && sample.stormGpu !== undefined ? ms(sample.stormGpu) : '—'}</dd></>}
         <dt>Render GPU</dt><dd>{measured && sample.renderGpu !== undefined ? ms(sample.renderGpu) : '—'}</dd>
+        {storm === 'webgpu' && <>
+          <dt>Glass pass GPU</dt><dd>{measured && sample.glassGpu !== undefined ? ms(sample.glassGpu) : '—'}</dd>
+          <dt>Pack rain GPU</dt><dd>{measured && sample.packGpu !== undefined ? ms(sample.packGpu) : '—'}</dd>
+          <dt>Rain import CPU / GPU</dt><dd>{measured && sample.importCpu !== undefined ? ms(sample.importCpu) : '—'} / {measured && sample.importGpu !== undefined ? ms(sample.importGpu) : '—'}</dd>
+          <dt>Rain atlas per upload</dt><dd>{measured && sample.atlasBytes !== undefined ? (sample.atlasBytes / 1048576).toFixed(2) + ' MiB' : '—'}</dd>
+        </>}
         {storm && <>
           <dt>Airborne pane hits/s</dt><dd>{measured && sample.flightHits !== undefined ? sample.flightHits.toLocaleString() : '—'}</dd>
           <dt>Direct pane hits/s</dt><dd>{measured && sample.patterHits !== undefined ? sample.patterHits.toLocaleString() : '—'}</dd>

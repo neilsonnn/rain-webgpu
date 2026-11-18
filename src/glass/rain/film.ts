@@ -7,7 +7,7 @@ import type { PaneImpact } from './surface'
 import { rainVelocity } from './weather'
 import { impactMotionGLSL, impactShapeGLSL } from './impact'
 import type { RainSqualls } from './squalls'
-import { depositOffset, filmSide, stormBudget } from './storm/budget'
+import { filmSide, stormBudget } from './storm/budget'
 
 const quadVertex = `varying vec2 vUv;
 void main(){ vUv=uv; gl_Position=vec4(position.xy,0.,1.); }`
@@ -39,7 +39,7 @@ void main(){
   water*=exp(-uMotion.x*3./uMotion.w);
   if(uLocal) water+=texelFetch(uDeposits,c,0).r;
   if(uNative){
-    int i=${depositOffset}+c.y*${filmSide}+c.x;
+    int i=c.y*${filmSide}+c.x;
     vec2 rg=texelFetch(uAtlas,ivec2(i%${stormBudget.atlasWidth},i/${stormBudget.atlasWidth}),0).rg;
     water+=(exp2(dot(rg,vec2(256.,1.))*(255./65535.)*32.)-1.)*1e-10*uVolumeToDepth;
   }

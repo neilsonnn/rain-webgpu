@@ -1,4 +1,4 @@
-import { stormBudget as b, stormOffsets as o, stormCount, filmSide, depositOffset, paneArena as arena, paneGridSide as side } from './budget'
+import { stormBudget as b, stormOffsets as o, filmSide, filmPixels, particlePixels, paneArena as arena, paneGridSide as side } from './budget'
 import { squallSide } from '../squalls'
 
 export const stormComputeWGSL = /* wgsl */`
@@ -166,7 +166,10 @@ fn fineImpact(seed: ptr<function,u32>) -> Hit {
 }
 @compute @workgroup_size(128)
 fn advance(@builtin(global_invocation_id) gid: vec3<u32>) {
-  let id=gid.x; if (id>=${o.trails}u) { return; }
+  let airEnd=u32(params.p[29].y); let dripEnd=u32(params.p[29].z);
+  var id=gid.x;
+  if (id>=dripEnd) { id=${o.rings}u+id-dripEnd; }
+  else if (id>=airEnd) { id=${o.spray}u+id-airEnd; }
   var p=particles[id]; let dt=params.p[0].x;
   if (id<${b.rain}u) {
     let panePopulation=frontSlot(id);
@@ -265,9 +268,35 @@ fn impacts(@builtin(global_invocation_id) gid: vec3<u32>) {
 }
 `
 
+export const stormCompactWGSL = /* wgsl */`
+struct Particle { p: vec4<f32>, v: vec4<f32>, a: vec4<f32>, }
+@group(0) @binding(0) var<uniform> params: array<vec4<f32>,32>;
+@group(0) @binding(1) var<storage,read> particles: array<Particle>;
+@group(0) @binding(2) var<storage,read_write> visible: array<atomic<u32>>;
+var<workgroup> groupCount: atomic<u32>;
+var<workgroup> groupStart: u32;
+@compute @workgroup_size(128)
+fn compact(@builtin(workgroup_id) group: vec3<u32>, @builtin(local_invocation_index) lane: u32) {
+  let base = group.x * 128u + ${o.spray}u;
+  let kind = select(select(0u, 1u, base >= ${o.beads}u), select(2u, 3u, base >= ${o.trails}u), base >= ${o.rings}u);
+  if (params[31][kind] == 0.0) { return; }
+  let id = base + lane;
+  let starts = vec4<u32>(${o.spray}u, ${o.beads}u, ${o.rings}u, ${o.trails}u);
+  let alive = particles[id].v.w > 0.0;
+  var rank = 0u;
+  if (alive) { rank = atomicAdd(&groupCount, 1u); }
+  workgroupBarrier();
+  if (lane == 0u && atomicLoad(&groupCount) > 0u) { groupStart = atomicAdd(&visible[kind], atomicLoad(&groupCount)); }
+  workgroupBarrier();
+  if (alive) { atomicStore(&visible[4u + starts[kind] - ${o.spray}u + groupStart + rank], id); }
+}
+`
+
 export const stormPackWGSL = /* wgsl */`
 struct Particle { p: vec4<f32>, v: vec4<f32>, a: vec4<f32>, }
+@group(0) @binding(0) var<uniform> params: array<vec4<f32>,32>;
 @group(0) @binding(1) var<storage,read> particles: array<Particle>;
+@group(0) @binding(2) var<storage,read> visible: array<u32>;
 @group(0) @binding(9) var<storage,read> landedWater: array<u32>;
 fn scalar(value: f32, lo: f32, span: f32) -> vec4<f32> {
   let q=u32(round(clamp((value-lo)/span,0.0,1.0)*65535.0));
@@ -278,13 +307,19 @@ fn scalar(value: f32, lo: f32, span: f32) -> vec4<f32> {
 }
 @fragment fn fragment(@builtin(position) at:vec4<f32>) -> @location(0) vec4<f32> {
   let pixel=u32(at.y)*${b.atlasWidth}u+u32(at.x);
-  if (pixel>=${depositOffset}u) {
-    let i=pixel-${depositOffset}u;
-    if (i<${filmSide*filmSide}u) { return scalar(log2(1.0+f32(landedWater[i])),0.0,32.0); }
-    return vec4<f32>(0.0,0.0,0.0,1.0);
+  if (pixel < ${filmPixels}u) { return scalar(log2(1.0+f32(landedWater[pixel])),0.0,32.0); }
+  let packed = pixel - ${filmPixels}u;
+  let slot = packed / ${particlePixels}u;
+  let ends = vec4<u32>(params[30]);
+  var id = slot;
+  if (slot >= ends.x) {
+    let kind = select(select(0u, 1u, slot >= ends.y), select(2u, 3u, slot >= ends.w), slot >= ends.z);
+    let rank = slot - ends[kind];
+    if (rank >= visible[kind]) { return vec4<f32>(0.0,0.0,0.0,1.0); }
+    let starts = vec4<u32>(${o.spray}u, ${o.beads}u, ${o.rings}u, ${o.trails}u);
+    id = visible[4u + starts[kind] - ${o.spray}u + rank];
   }
-  let id=pixel/10u;
-  let p=particles[id]; let channel=pixel%10u;
+  let p=particles[id]; let channel=packed%${particlePixels}u;
   if (channel==0u) { return scalar(p.p.x,-6.0,12.0); }
   if (channel==1u) { return scalar(p.p.y,-2.0,10.0); }
   if (channel==2u) { return scalar(p.p.z,-6.0,8.0); }
