@@ -114,7 +114,7 @@ export default function Glass() {
     setSettings(live.current); world.current?.invalidate()
   }, [live, setSettings, sceneKey])
   useEffect(() => {
-    const rain = new RainAudio(host.current); rainAudio.current = rain
+    const rain = new RainAudio(); rainAudio.current = rain
     return () => { rain.dispose(); rainAudio.current = null }
   }, [])
   useEffect(() => {
@@ -142,7 +142,7 @@ export default function Glass() {
           onRenderSize: (width: number, height: number) => setRenderSize({ width, height }),
           onRainBackend: (backend: 'starting' | 'webgpu') => { if (!cancelled) setStormBackend(backend) },
         }),
-        onBrushHits: (contact, hits) => rainAudio.current?.brushHits(contact, hits),
+        onBrushPressed: pressed => rainAudio.current?.setBrushPressed(pressed),
       })
       if (view.current) instance.setView(view.current)
       world.current = instance

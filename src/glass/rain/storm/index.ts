@@ -18,7 +18,7 @@ import type { RainTerrain } from '../terrain'
 import { defaultQuality } from '../../quality'
 
 export function createStorm(renderer: WebGLRenderer, plants: ReturnType<typeof createRainPlants>,
-  readSettings: () => GlassSettings, pane?: PaneSize, onReady?: () => void, timings?: FrameTimings, options: { adapter?: GPUAdapter; terrain?: Pick<RainTerrain,'texture'|'grid'>; onFailure?: (message: string) => void; onBrushHits?: (contact: number, hits: number) => void } = {}) {
+  readSettings: () => GlassSettings, pane?: PaneSize, onReady?: () => void, timings?: FrameTimings, options: { adapter?: GPUAdapter; terrain?: Pick<RainTerrain,'texture'|'grid'>; onFailure?: (message: string) => void } = {}) {
   const mesh = new Group(), front = new Group(), shake = createStormShake()
   const width = pane?.width ?? 4.8, height = pane?.height ?? 4.8, centerY = pane?.centerY ?? 1.8
   const bounds = new Vector4(-width * .5, centerY - height * .5, width, height)
@@ -33,7 +33,7 @@ export function createStorm(renderer: WebGLRenderer, plants: ReturnType<typeof c
   let started = false, disposed = false, failed = false, strength = 0, wetUntil = 0, clock = 12
   let plantsMoving = false, nextSettleCheck = 0
   // Keep taps during asynchronous GPU startup, including on a dry, paused pane.
-  const strokes = Array.from({ length: 48 }, () => ({ ax: 0, ay: 0, bx: 0, by: 0, radius: 0, pressure: 0, dt: 0, hits: 0, push: false, contact: -1 }))
+  const strokes = Array.from({ length: 48 }, () => ({ ax: 0, ay: 0, bx: 0, by: 0, radius: 0, pressure: 0, dt: 0, hits: 0, push: false }))
   const point = new Vector3(), velocity = new Vector3()
   let strokeCount = 0
   function applyStrokes(settings: GlassSettings) {
@@ -44,7 +44,7 @@ export function createStorm(renderer: WebGLRenderer, plants: ReturnType<typeof c
     const share = Math.min(1, stormBudget.brushCommands / Math.max(1, requested))
     let cumulative = 0, allocated = 0
     for (let i = 0; i < strokeCount; i++) {
-      const { ax, ay, bx, by, radius, pressure, dt, hits, push, contact } = strokes[i]
+      const { ax, ay, bx, by, radius, pressure, dt, hits, push } = strokes[i]
       if (push) {
         film.stroke(ax,ay,bx,by,radius,pressure)
         gpu.stroke(ax, ay, bx, by, radius, pressure, dt)
@@ -53,7 +53,6 @@ export function createStorm(renderer: WebGLRenderer, plants: ReturnType<typeof c
       cumulative += hits
       const count = Math.round(cumulative * share) - allocated
       allocated += count
-      let paneHits = 0
       for (let j = 0; j < hits; j++) {
         const t = (j + Math.random()) / hits
         // The minimum of two uniform area samples gives a density proportional
@@ -62,14 +61,12 @@ export function createStorm(renderer: WebGLRenderer, plants: ReturnType<typeof c
         const angle = Math.random() * Math.PI * 2, spread = radius * radial
         point.set(ax + (bx - ax) * t + spread * Math.cos(angle), ay + (by - ay) * t + spread * Math.sin(angle), 0)
         if (point.x < bounds.x || point.x > bounds.x + bounds.z || point.y < bounds.y || point.y > bounds.y + bounds.w) continue
-        paneHits++
         const diameter = rainDiameter(.35 + .65 * Math.random(), intensity, settings.rainDropSize) * (1 - .38 * radial * radial)
         if (Math.floor((j+1)*count/hits) === Math.floor(j*count/hits)) { film.contact(point.x,point.y,diameter,clock); continue }
         rainVelocity(velocity, point, clock, settings, intensity, diameter, squalls.phase)
         velocity.z = -Math.max(Math.abs(velocity.z), 2 + 3 * Math.random())
         gpu.paneHit(point, velocity, diameter)
       }
-      if (contact >= 0 && paneHits) options.onBrushHits?.(contact, paneHits)
     }
     strokeCount = 0
   }
@@ -107,13 +104,12 @@ export function createStorm(renderer: WebGLRenderer, plants: ReturnType<typeof c
     get texture() { return gpu?.texture ?? blank },
     get bounds() { return bounds },
     texel: 1 / defaultQuality.waterSize,
-    stroke(ax: number, ay: number, bx: number, by: number, radius: number, pressure: number, dt: number, hits: number, push: boolean, contact = -1) {
+    stroke(ax: number, ay: number, bx: number, by: number, radius: number, pressure: number, dt: number, hits: number, push: boolean) {
       if (disposed || failed) return
       initialize()
       const slot = strokes[Math.min(strokeCount, strokes.length - 1)]
       slot.ax = ax; slot.ay = ay; slot.bx = bx; slot.by = by
       slot.radius = radius; slot.pressure = pressure; slot.dt = dt; slot.hits = hits; slot.push = push
-      slot.contact = contact
       strokeCount = Math.min(strokes.length, strokeCount + 1)
       const settings=readSettings()
       wetUntil = Math.max(wetUntil, clock + settings.rainBeadLifetime + settings.rainDrying)

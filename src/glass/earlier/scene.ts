@@ -106,7 +106,7 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
   const rain = createStorm(renderer, foliage.rain, () => settings.current, composition.pane, () => {
     if (rain.backend !== 'starting') options.onRainBackend?.(rain.backend)
     invalidate()
-  }, options.timings, { adapter: options.gpuAdapter, terrain: {texture:relief,grid:wire.surfaceGrid}, onBrushHits: options.onBrushHits, onFailure: message => { waterTouch.suspend(); failure(message) } })
+  }, options.timings, { adapter: options.gpuAdapter, terrain: {texture:relief,grid:wire.surfaceGrid}, onFailure: message => { waterTouch.suspend(); failure(message) } })
   frontRain.add(rain.front); garden.add(rain.mesh)
   glass.uniforms.uRainWater.value = rain.surface.texture
   glass.uniforms.uRainBounds.value.copy(rain.surface.bounds)
@@ -384,7 +384,7 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
       controls.update()
     }
     invalidate()
-  })
+  }, options.onBrushPressed)
   const dispose = () => {
     if (disposed) return
     renderTimer.dispose(); glassTimer.dispose()

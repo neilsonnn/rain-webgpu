@@ -32,29 +32,22 @@ beforeEach(() => {
 afterEach(() => { audio.dispose(); vi.unstubAllGlobals() })
 
 describe('rain audio lifecycle', () => {
-  it('attacks on the first impact packet, follows its density, and takes the loudest contact', async () => {
-    audio.set(1,.5,'glass')
+  it('reverses one short fade at each press and release without scheduling future volume changes', async () => {
+    audio.set(0, .5)
     gestures.dispatchEvent(new Event('pointerdown'))
-    expect(contexts).toHaveLength(0)
-    audio.brushHits(0, 8)
+    audio.setBrushPressed(true)
     await vi.waitFor(() => expect(contexts[0].source.start).toHaveBeenCalledOnce())
-    const gain = contexts[0].gains[0]
-    const attack = () => gain.setTargetAtTime.mock.calls.at(-2)!
-    const initial = attack()[0]
-    expect(initial).toBeGreaterThan(.25)
-    expect(attack()[2]).toBeLessThan(.01)
-    audio.brushHits(1, 8)
-    expect(attack()[0]).toBe(initial)
-    audio.brushHits(0, 16)
-    expect(attack()[0]).toBeGreaterThan(initial)
-    contexts[0].currentTime = 1
-    audio.brushHits(0, 1)
-    expect(attack()[0]).toBeLessThan(initial / 2)
-    expect(gain.setTargetAtTime.mock.lastCall).toEqual([0, 1.035, .04])
+    const context = contexts[0], gain = context.gains[0].setTargetAtTime
+    context.currentTime = .007
+    audio.setBrushPressed(false)
+    context.currentTime = .012
+    audio.setBrushPressed(true)
+    audio.setBrushPressed(true)
+    context.currentTime = .03
+    audio.setBrushPressed(false)
+    expect(gain.mock.calls).toEqual([[.5, 0, .03], [0, .007, .06], [.5, .012, .03], [0, .03, .06]])
     expect(fetch).toHaveBeenCalledTimes(1)
-    expect(contexts[0].source.start).toHaveBeenCalledOnce()
-    page.hidden = true; page.dispatchEvent(new Event('visibilitychange'))
-    expect(contexts[0].suspend).toHaveBeenCalledOnce()
+    expect(context.source.start).toHaveBeenCalledOnce()
   })
   it('prepares the glass sample before interaction without starting live output', async () => {
     audio.dispose()
@@ -65,19 +58,44 @@ describe('rain audio lifecycle', () => {
     expect(contexts).toHaveLength(0)
     audio.set(0, .5)
     gestures.dispatchEvent(new Event('pointerdown'))
-    audio.brushHits(0, 10)
+    audio.setBrushPressed(true)
     await vi.waitFor(() => expect(contexts[0].source.start).toHaveBeenCalledOnce())
     expect(fetch).toHaveBeenCalledTimes(1)
     expect(contexts[0].decodeAudioData).not.toHaveBeenCalled()
   })
-  it('lets the tin loop swell and recede independently of glass impacts', async () => {
+  it('keeps a new press audible if an earlier release is still suspending the output', async () => {
+    audio.set(0, .5)
+    gestures.dispatchEvent(new Event('pointerdown'))
+    audio.setBrushPressed(true)
+    await vi.waitFor(() => expect(contexts[0].source.start).toHaveBeenCalledOnce())
+    const context = contexts[0]
+    let finishSuspend!: () => void
+    context.suspend.mockImplementationOnce(() => new Promise<void>(resolve => {
+      finishSuspend = () => { context.state = 'suspended'; resolve() }
+    }))
+    vi.useFakeTimers()
+    try {
+      audio.setBrushPressed(false)
+      vi.advanceTimersByTime(200)
+      expect(context.suspend).not.toHaveBeenCalled()
+      vi.advanceTimersByTime(250)
+      expect(context.suspend).toHaveBeenCalledOnce()
+      audio.setBrushPressed(true)
+      finishSuspend()
+      await Promise.resolve()
+      expect(context.state).toBe('running')
+      expect(context.gains[0].setTargetAtTime.mock.lastCall?.[0]).toBe(.5)
+    } finally { vi.useRealTimers() }
+  })
+  it('lets the tin loop swell and recede independently of brush presses', async () => {
     audio.set(1, .5)
     gestures.dispatchEvent(new Event('pointerdown'))
     await vi.waitFor(() => expect(contexts[0].source.start).toHaveBeenCalledOnce())
     const context = contexts[0], tin = context.gains[0]
     expect(tin.setTargetAtTime.mock.lastCall).toEqual([.5, 0, .9])
-    audio.brushHits(0, 10)
+    audio.setBrushPressed(true)
     expect(tin.setTargetAtTime).toHaveBeenCalledTimes(1)
+    audio.setBrushPressed(false)
     vi.useFakeTimers()
     try {
       audio.set(0, .5)

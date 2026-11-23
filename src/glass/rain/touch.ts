@@ -3,8 +3,8 @@ import type { PerspectiveCamera } from 'three'
 import type { GlassSettings } from '../settings'
 
 const between = (low: number, high: number) => low + Math.random() * (high - low)
-function emptyPress(slot: number) {
-  return { slot, down: false, virtual: false, moved: false, anchored: false,
+function emptyPress() {
+  return { down: false, virtual: false, moved: false, anchored: false,
     screenX: 0, screenY: 0, force: 0, x: 0, y: 0, radius: 0,
     start: 0, last: 0, carry: 0, pending: 0, next: 0, tailAt: 0, tailEnd: 0 }
 }
@@ -13,16 +13,17 @@ type Contact = { touch: boolean; x: number; y: number; force: number; due: numbe
 type Pair = { a: Contact; b: Contact; x: number; y: number; span: number; orbiting: boolean }
 
 export function attachWaterTouch(host: HTMLElement, camera: PerspectiveCamera, settings: () => GlassSettings,
-  water: { readonly ready: boolean; stroke(ax: number, ay: number, bx: number, by: number, radius: number, pressure: number, dt: number, hits: number, push: boolean, contact: number): void },
-  invalidate: () => void, begin: () => void, orbit: (dx: number, dy: number, distanceRatio: number) => void) {
+  water: { readonly ready: boolean; stroke(ax: number, ay: number, bx: number, by: number, radius: number, pressure: number, dt: number, hits: number, push: boolean): void },
+  invalidate: () => void, begin: () => void, orbit: (dx: number, dy: number, distanceRatio: number) => void,
+  onBrushPressed?: (pressed: boolean) => void) {
   const ray = new Raycaster(), ndc = new Vector2(), plane = new Plane(new Vector3(0, 0, 1), 0), point = new Vector3()
-  const pool = Array.from({ length: 24 }, (_, slot) => emptyPress(slot)), fingers = new Map<number, Contact>()
+  const pool = Array.from({ length: 24 }, emptyPress), fingers = new Map<number, Contact>()
   let pair: Pair | undefined
   let steady: Press | undefined, wandering: Press | undefined, liftAt = 0, nextTap = 0, wake = 0
   const consume = (event: PointerEvent) => { event.preventDefault(); event.stopImmediatePropagation() }
 
   function deposit(p: Press, hits: number, spread = 1) {
-    water.stroke(p.x, p.y, p.x, p.y, p.radius * spread, p.force, 0, hits, false, p.virtual ? -1 : p.slot)
+    water.stroke(p.x, p.y, p.x, p.y, p.radius * spread, p.force, 0, hits, false)
   }
 
   function sample(p: Press, now: number, first = false) {
@@ -44,7 +45,7 @@ export function attachWaterTouch(host: HTMLElement, camera: PerspectiveCamera, s
       const demand = p.carry + Math.hypot(point.x - p.x, point.y - p.y) * 44 * Math.sqrt(gain) / Math.max(.003, p.radius)
       const hits = Math.floor(demand)
       p.carry = demand - hits
-      water.stroke(p.x, p.y, point.x, point.y, p.radius, p.force, dt, hits, !p.virtual, p.virtual ? -1 : p.slot)
+      water.stroke(p.x, p.y, point.x, point.y, p.radius, p.force, dt, hits, !p.virtual)
     }
     p.x = point.x; p.y = point.y; p.anchored = true; p.moved = false
     if (first) {
@@ -89,6 +90,17 @@ export function attachWaterTouch(host: HTMLElement, camera: PerspectiveCamera, s
     c.patter = undefined
   }
   function paired(c: Contact) { return pair && (c === pair.a || c === pair.b) }
+  function syncBrushPressed() {
+    if (water.ready && settings().glass && camera.position.z > 0) {
+      for (const c of fingers.values()) {
+        if (Number.isFinite(c.due) && !(pair?.orbiting && paired(c)) && (c.patter?.anchored ?? c.touch)) {
+          onBrushPressed?.(true)
+          return
+        }
+      }
+    }
+    onBrushPressed?.(false)
+  }
   function pairTouches() {
     if (pair) return
     let a: Contact | undefined
@@ -106,6 +118,7 @@ export function attachWaterTouch(host: HTMLElement, camera: PerspectiveCamera, s
     if (!g.orbiting) {
       if (Math.hypot(dx, dy) < 7 && Math.abs(span - g.span) < 10) return
       g.orbiting = true; stopPainting(g.a, false); stopPainting(g.b, false)
+      syncBrushPressed()
     }
     orbit(dx, dy, g.span > 2 && span > 2 ? g.span / span : 1)
     g.x = x; g.y = y; g.span = span
@@ -120,6 +133,7 @@ export function attachWaterTouch(host: HTMLElement, camera: PerspectiveCamera, s
     fingers.set(event.pointerId, c); if (touch) pairTouches()
     host.setPointerCapture(event.pointerId); host.focus({ preventScroll: true })
     if (!touch) paint(c, now)
+    syncBrushPressed()
     invalidate()
   }
   const move = (event: PointerEvent) => {
@@ -149,7 +163,7 @@ export function attachWaterTouch(host: HTMLElement, camera: PerspectiveCamera, s
       if (navigation) (c === pair.a ? pair.b : pair.a).due = Infinity
       pair = undefined
     }
-    release(event.pointerId); pairTouches(); invalidate()
+    release(event.pointerId); pairTouches(); syncBrushPressed(); invalidate()
   }
   function endDebug() {
     if (steady) lift(steady, performance.now(), false)
@@ -176,6 +190,7 @@ export function attachWaterTouch(host: HTMLElement, camera: PerspectiveCamera, s
     window.clearTimeout(wake); wake = 0; endDebug(); pair = undefined
     for (const [id, c] of fingers) { stopPainting(c, false); release(id) }
     for (const p of pool) p.pending = 0
+    onBrushPressed?.(false)
   }
   const context = (event: Event) => event.preventDefault()
   // Browsers deliver horizontal trackpad swipes as wheel events. Keep the
@@ -201,6 +216,7 @@ export function attachWaterTouch(host: HTMLElement, camera: PerspectiveCamera, s
       for (const c of fingers.values()) {
         if (s.glass && now >= c.due && !(paired(c) && pair?.orbiting)) paint(c, now)
       }
+      if (fingers.size) syncBrushPressed()
       if (debug && s.glass) debugPresses(now)
       else if (steady || wandering || nextTap) endDebug()
       let next = fingers.size || debug ? now + 50 : Infinity

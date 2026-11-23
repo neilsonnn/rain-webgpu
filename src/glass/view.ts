@@ -17,7 +17,7 @@ export interface GlassSceneOptions {
   onQualityCaps?: (caps: QualityCaps) => void
   gpuAdapter?: GPUAdapter
   onRainBackend?: (backend: 'webgpu') => void
-  onBrushHits?: (contact: number, hits: number) => void
+  onBrushPressed?: (pressed: boolean) => void
 }
 
 export type ProfileView = 'scene' | 'garden' | 'meshes'
