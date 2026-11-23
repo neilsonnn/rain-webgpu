@@ -68,7 +68,7 @@ export default function Glass() {
     const still = (settings: GlassSettings) => ({ ...settings, playing: settings.playing && !reduced })
     const earlier = Object.keys(arrangements).map(key => {
       const arrangement = key as Arrangement
-      return [presetKey('earlier', arrangement), still(standalone && arrangement === 'original' ? presentationSettings() : glassVersions.earlier.loadGlassSettings(arrangement))]
+      return [presetKey('earlier', arrangement), still(standalone && arrangement === 'original' ? { ...presentationSettings(), rain: false } : glassVersions.earlier.loadGlassSettings(arrangement))]
     })
     return { ...Object.fromEntries(earlier), current: still(glassVersions.current.loadGlassSettings()) } as Record<PresetKey, GlassSettings>
   })
@@ -108,11 +108,21 @@ export default function Glass() {
   const [saving, setSaving] = useState(false), [saveStatus, setSaveStatus] = useState({ key: sceneKey, text: '' })
   const [panel, setPanel] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null), panelToggle = useRef<HTMLButtonElement>(null)
+  const rainIntroPending = useRef(true)
   const change = useCallback(<K extends keyof GlassSettings>(key: K, value: GlassSettings[K]) => {
+    if (key === 'rain') rainIntroPending.current = false
     setSaveStatus({ key: sceneKey, text: '' })
     live.current = { ...live.current, [key]: value }
     setSettings(live.current); world.current?.invalidate()
   }, [live, setSettings, sceneKey])
+  useEffect(() => {
+    if (!standalone) rainIntroPending.current = false
+    if (!rainIntroPending.current) return
+    const timer = window.setTimeout(() => {
+      if (rainIntroPending.current && live.current.playing) change('rain', true)
+    }, 5000)
+    return () => window.clearTimeout(timer)
+  }, [change, live, standalone])
   useEffect(() => {
     const rain = new RainAudio(); rainAudio.current = rain
     return () => { rain.dispose(); rainAudio.current = null }
@@ -179,11 +189,13 @@ export default function Glass() {
     return () => { window.removeEventListener('keydown', key); document.removeEventListener('pointerdown', outside) }
   }, [change, panel, standalone])
   const reset = () => {
+    rainIntroPending.current = false
     setSaveStatus({ key: sceneKey, text: '' })
     live.current = { ...defaults, playing: live.current.playing }
     setSettings(live.current); world.current?.resetView()
   }
   const tune = (values: Partial<GlassSettings>) => {
+    if (values.rain !== undefined) rainIntroPending.current = false
     setSaveStatus({ key: sceneKey, text: '' })
     live.current = { ...live.current, ...values }
     setSettings(live.current); world.current?.invalidate()
