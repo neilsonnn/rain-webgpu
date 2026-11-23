@@ -45,7 +45,7 @@ describe('rain audio lifecycle', () => {
     audio.setBrushPressed(true)
     context.currentTime = .03
     audio.setBrushPressed(false)
-    expect(gain.mock.calls).toEqual([[.5, 0, .03], [0, .007, .06], [.5, .012, .03], [0, .03, .06]])
+    expect(gain.mock.calls).toEqual([[1, 0, .03], [0, .007, .06], [1, .012, .03], [0, .03, .06]])
     expect(fetch).toHaveBeenCalledTimes(1)
     expect(context.source.start).toHaveBeenCalledOnce()
   })
@@ -84,7 +84,7 @@ describe('rain audio lifecycle', () => {
       finishSuspend()
       await Promise.resolve()
       expect(context.state).toBe('running')
-      expect(context.gains[0].setTargetAtTime.mock.lastCall?.[0]).toBe(.5)
+      expect(context.gains[0].setTargetAtTime.mock.lastCall?.[0]).toBe(1)
     } finally { vi.useRealTimers() }
   })
   it('lets the tin loop swell and recede independently of brush presses', async () => {
