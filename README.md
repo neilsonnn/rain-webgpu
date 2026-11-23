@@ -1,4 +1,4 @@
-# Wire Glass
+# rain-webgpu
 
 A standalone React and Three.js greenhouse with wired patterned glass, procedural foliage, interactive WebGPU rain and ambient recordings.
 
