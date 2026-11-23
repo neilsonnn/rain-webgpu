@@ -2,9 +2,8 @@ import { Vector3 } from 'three'
 import type { createRainPlants } from '../plants'
 import { stormBudget } from './budget'
 
-export interface StormCollider { center:Vector3; normal:Vector3; across:Vector3; along:Vector3; width:number; height:number }
-export function createStormColliders(plants:ReturnType<typeof createRainPlants>, extras:readonly StormCollider[]) {
-  const count=plants.blades.length+extras.length
+export function createStormColliders(plants:ReturnType<typeof createRainPlants>) {
+  const count=plants.blades.length
   const data=new Float32Array(Math.max(1,count)*20), heads=new Int32Array(stormBudget.hash)
   const minimum=new Vector3(),maximum=new Vector3(); let largest=0
   function put(i:number,p:Vector3,n:Vector3,across:Vector3,along:Vector3,width:number,height:number) {
@@ -18,12 +17,11 @@ export function createStormColliders(plants:ReturnType<typeof createRainPlants>,
     minimum.x=Math.min(minimum.x,p.x-r);minimum.y=Math.min(minimum.y,p.y-r);minimum.z=Math.min(minimum.z,p.z-r)
     maximum.x=Math.max(maximum.x,p.x+r);maximum.y=Math.max(maximum.y,p.y+r);maximum.z=Math.max(maximum.z,p.z+r);largest=Math.max(largest,r)
   }
-  return { data,heads,count,leafCount:plants.blades.length,minimum,maximum,get largest() { return largest },
+  return { data,heads,count,minimum,maximum,get largest() { return largest },
     update(time: number, breeze: number) {
       plants.colliders(time, breeze, false)
       heads.fill(-1);minimum.set(Infinity,Infinity,Infinity);maximum.set(-Infinity,-Infinity,-Infinity);largest=0
       plants.blades.forEach((b,i)=>put(i,b.center,b.normal,b.across,b.along,b.binding.leaf.length*b.binding.leaf.width*.36,b.binding.leaf.length*.49))
-      extras.forEach((e,i)=>put(plants.blades.length+i,e.center,e.normal,e.across,e.along,e.width,e.height))
       if(!count) { minimum.set(0,0,0);maximum.set(0,0,0) }
     },
   }

@@ -1,4 +1,5 @@
 import type { FrameTimings } from './performance'
+import type { GpuQuality, QualityCaps } from './quality'
 
 export interface GlassView {
   position: [number, number, number]
@@ -8,10 +9,15 @@ export interface GlassView {
 
 export interface GlassSceneOptions {
   standalone?: boolean
-  suspended?: boolean
   centerTaps?: { readonly current: boolean }
   timings?: FrameTimings
+  quality?: { readonly current: GpuQuality }
+  profileView?: { readonly current: ProfileView }
+  onRenderSize?: (width: number, height: number) => void
+  onQualityCaps?: (caps: QualityCaps) => void
   gpuAdapter?: GPUAdapter
   onRainBackend?: (backend: 'webgpu') => void
-  onWaterFlow?: (flow: number) => void
+  onBrushHits?: (contact: number, hits: number) => void
 }
+
+export type ProfileView = 'scene' | 'garden' | 'meshes'

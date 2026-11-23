@@ -5,6 +5,7 @@ import { rainExposureGLSL, rainFragmentGLSL } from '../shaders'
 import { waterFragmentGLSL } from '../surface'
 import { impactMotionGLSL } from '../impact'
 import { stormBudget as b, stormOffsets as o, stormCount, filmPixels, particlePixels } from './budget'
+import { defaultQuality } from '../../quality'
 
 const decodeGLSL = /* glsl */`
 attribute float stormIndex;
@@ -55,6 +56,7 @@ void main() {
 `
 const surfaceVertex = decodeGLSL + impactMotionGLSL + /* glsl */`
 uniform vec4 uStormBounds;
+uniform float uWaterSize;
 varying vec2 vWaterPoint;
 varying vec2 vWaterRadii;
 varying vec4 vWaterShape;
@@ -83,7 +85,7 @@ void main() {
     float stretch=1.+min(2.,length(v.xy)*1.3);
     radii=vec2(r*spread/sqrt(stretch),r*spread*sqrt(stretch)); height/=spread*spread;
   }
-  float footprint=uStormBounds.z/1536.*.7; float area=radii.x*radii.y;
+  float footprint=uStormBounds.z/uWaterSize*.7; float area=radii.x*radii.y;
   radii=max(radii,vec2(footprint)); float filterWeight=area/(radii.x*radii.y); height*=filterWeight; coverage*=filterWeight;
   vWaterPoint=position.xy*2.; vWaterRadii=radii; vWaterShape=vec4(height,coverage,kind,angle);
   vWaterRotation=vec2(cos(angle),sin(angle)); vec2 q=vWaterPoint*radii;
@@ -108,13 +110,17 @@ export function createStormRendering(texture: Texture, bounds: Vector4) {
   const backMaterial=material(-1), frontMaterial=material(1)
   const mesh=new Mesh(rainGeometry,backMaterial), front=new Mesh(rainGeometry,frontMaterial)
   for(const m of [mesh,front]) { m.frustumCulled=false; m.renderOrder=3 }
-  const surfaceMaterial=new ShaderMaterial({ vertexShader:surfaceVertex,fragmentShader:waterFragmentGLSL,uniforms:{...uniforms,uStormBase:surfaceBase},
+  const waterSize = { value: defaultQuality.waterSize }
+  const surfaceMaterial=new ShaderMaterial({ vertexShader:surfaceVertex,fragmentShader:waterFragmentGLSL,uniforms:{...uniforms,uStormBase:surfaceBase,uWaterSize:waterSize},
     transparent:true,blending:AdditiveBlending,premultipliedAlpha:true,depthWrite:false,depthTest:false,toneMapped:false })
   const surfaceMesh=new Mesh(surfaceGeometry,surfaceMaterial); surfaceMesh.frustumCulled=false
   const scene=new Scene(), camera=new OrthographicCamera(-1,1,1,-1,0,1); scene.add(surfaceMesh)
-  const target=new WebGLRenderTarget(1536,1536,{ type:HalfFloatType,minFilter:LinearFilter,magFilter:LinearFilter,depthBuffer:false })
+  const target=new WebGLRenderTarget(waterSize.value,waterSize.value,{ type:HalfFloatType,minFilter:LinearFilter,magFilter:LinearFilter,depthBuffer:false })
   const clear=new Color()
   return { mesh,front,uniforms,texture:target.texture,
+    setWaterSize(side: number) {
+      if (side !== waterSize.value) { waterSize.value = side; target.setSize(side, side) }
+    },
     setPopulation(air:number, drips:number, beads:number, rings:number, trails:number) {
       const airborne = air + drips
       uniforms.uStormEnds.value.set(air, airborne, airborne + beads, airborne + beads + rings)

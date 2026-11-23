@@ -1,62 +1,68 @@
 import {
-  Color, CylinderGeometry, Group, InstancedBufferAttribute, InstancedMesh, Matrix4,
-  MeshDepthMaterial, MeshStandardMaterial, Quaternion, RGBADepthPacking, Vector2, Vector3,
+  FrontSide, InstancedBufferAttribute, InstancedMesh, Matrix4, MeshDepthMaterial, MeshStandardMaterial,
+  NoBlending, PlaneGeometry, Quaternion, RGBADepthPacking, Vector2, Vector3,
 } from 'three'
 import type { GlassSettings } from './settings'
 import { conductorF0, dielectricFresnel, embeddedWireDepth, zinc } from './optics'
+import { iron } from '../optics'
 
-export const wireVertexGLSL = /* glsl */`
-attribute float wireAxis;
-uniform float uWireRadius;
-uniform vec2 uWireResolution;
-varying vec3 vWireWorld;
-varying float vWireCoverage;
-vec3 wireForm(vec3 p) {
-  if (wireAxis < .5) p.x += sin(p.y * 7.1) * uWireRadius * .28;
-  else p.y += sin(p.x * 6.3) * uWireRadius * .28;
-  return p;
-}
-`
+type Finish = 'zinc' | 'iron'
 
-export function wireMaterials() {
-  // The wire buffer stores premultiplied pixel coverage. Resolved cylinders
-  // remain opaque; subpixel cylinders retain their integrated color/coverage.
-  const material = new MeshStandardMaterial({ metalness: 1, roughness: .34, color: new Color(.66, .67, .67), transparent: true, depthWrite: true })
+export function wireMaterials(finish: Finish = 'zinc') {
+  const galvanized = finish === 'zinc'
+  const material = new MeshStandardMaterial({ metalness: 1, roughness: .34, blending: NoBlending })
+  // The ribbon faces the light during a shadow draw, just as it faces the eye during a color draw.
+  material.shadowSide = FrontSide
   const depth = new MeshDepthMaterial({ depthPacking: RGBADepthPacking })
   const uniforms = {
     uWireRadius: { value: .00038 }, uWireResolution: { value: new Vector2(1, 1) }, uWireRoughness: { value: .34 },
     uWirePatina: { value: .3 }, uWireLightTransmission: { value: .957 },
   }
+  const shape = /* glsl */`
+    uniform float uWireRadius;
+    varying vec4 vWireProfile;
+    float wireOffset() {
+      float warp = .28 * sin(vWireProfile.z) ${galvanized ? '' : '+ .065 * sin(vWireProfile.w)'};
+      return vWireProfile.x - uWireRadius * vWireProfile.y * warp;
+    }
+  `
   for (const [m, beauty] of [[material, true], [depth, false]] as const) {
+    const lighting = beauty ? 'varying vec3 vWireSide, vWireFront, vWireWorld;' : ''
     m.onBeforeCompile = shader => {
       Object.assign(shader.uniforms, uniforms)
-      shader.vertexShader = wireVertexGLSL + shader.vertexShader
-        .replace('#include <project_vertex>', /* glsl */`
-          vec4 wireWorld = modelMatrix * instanceMatrix * vec4(transformed, 1.);
-          wireWorld.xyz = wireForm(wireWorld.xyz);
-          vWireWorld = wireWorld.xyz;
-          vec4 mvPosition = viewMatrix * wireWorld;
-          gl_Position = projectionMatrix * mvPosition;
-          ${beauty ? /* glsl */`
-            // Rasterize a minimum 1.5-pixel footprint, conserving the actual
-            // strand's projected coverage. Only screen XY expands: physical
-            // depth, metal normals and the shadow geometry are unchanged.
-            vec4 wireCenter = modelMatrix * instanceMatrix * vec4(0., position.y, 0., 1.);
-            wireCenter.xyz = wireForm(wireCenter.xyz);
-            vec4 centerClip = projectionMatrix * viewMatrix * wireCenter;
-            float radiusPixels = uWireRadius * abs(projectionMatrix[1][1]) * uWireResolution.y * .5 / max(.001, -mvPosition.z);
-            float expansion = max(1., .75 / max(.00001, radiusPixels));
-            gl_Position.xy += (gl_Position.xy - centerClip.xy * gl_Position.w / max(.001, centerClip.w)) * (expansion - 1.);
-            vWireCoverage = 1. / expansion;
-          ` : ''}
-        `)
-        .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\n#ifdef USE_SHADOWMAP\nworldPosition = wireWorld;\n#endif')
-      if (beauty) shader.fragmentShader = /* glsl */`
-        varying vec3 vWireWorld;
-        varying float vWireCoverage;
-        uniform float uWireRoughness;
-        uniform float uWirePatina;
-        uniform float uWireLightTransmission;
+      shader.vertexShader = `uniform float uWireRadius;
+        uniform vec2 uWireResolution;
+        attribute float wirePhase;
+        varying vec4 vWireProfile;
+        ${lighting}
+      ` + shader.vertexShader.replace('#include <project_vertex>', /* glsl */`
+        mat4 wireMatrix = modelMatrix * instanceMatrix;
+        vec4 wireCenter = wireMatrix * vec4(0., position.y, 0., 1.);
+        vec4 centerView = viewMatrix * wireCenter;
+        vec3 along = normalize(mat3(viewMatrix) * wireMatrix[1].xyz);
+        vec3 eye = isPerspectiveMatrix(projectionMatrix) ? -centerView.xyz : vec3(0., 0., 1.);
+        vec3 side = cross(along, eye);
+        side *= inversesqrt(max(dot(side, side), 1e-12));
+        bool vertical = abs(instanceMatrix[1].y) > abs(instanceMatrix[1].x);
+        vec3 warpAxis = vertical ? vec3(1., 0., 0.) : vec3(0., 1., 0.);
+        float travel = vertical ? wireCenter.y : wireCenter.x;
+        float halfWidth = uWireRadius * ${galvanized ? '1.28' : '1.345'};
+        ${beauty ? `// Half a filter footprint beyond the physical edge also covers subpixel strands.
+        halfWidth += 1.5 * abs(centerView.z) / (projectionMatrix[1][1] * uWireResolution.y);
+        vWireSide = side; vWireFront = cross(side, along); vWireWorld = wireCenter.xyz;` : ''}
+        vWireProfile = vec4(position.x * halfWidth, dot(side, mat3(viewMatrix * modelMatrix) * warpAxis),
+          travel * (vertical ? 7.1 : 6.3) + wirePhase, travel * (vertical ? 24.7 : 22.1) + wirePhase * 2.3);
+        vec4 mvPosition = centerView + vec4(side * vWireProfile.x, 0.);
+        gl_Position = projectionMatrix * mvPosition;
+      `)
+      shader.fragmentShader = [shape, lighting, shader.fragmentShader].join('\n')
+      if (!beauty) {
+        shader.fragmentShader = shader.fragmentShader.replace('#include <clipping_planes_fragment>',
+          '#include <clipping_planes_fragment>\nif (abs(wireOffset()) > uWireRadius) discard;')
+        return
+      }
+      shader.fragmentShader = /* glsl */`
+        uniform float uWireRoughness, uWirePatina, uWireLightTransmission;
         float wireFilteredSine(float phase) {
           vec2 footprint = vec2(dFdx(phase), dFdy(phase));
           return sin(phase) * exp(-.125 * dot(footprint, footprint));
@@ -64,42 +70,53 @@ export function wireMaterials() {
       ` + shader.fragmentShader
         .replace('#include <roughnessmap_fragment>', /* glsl */`
           #include <roughnessmap_fragment>
+          float offset = wireOffset();
+          float pixelWidth = max(fwidth(offset), 1e-8);
+          float left = max(-uWireRadius, offset - .5 * pixelWidth);
+          float right = min(uWireRadius, offset + .5 * pixelWidth);
+          float coverage = clamp((right - left) / pixelWidth, 0., 1.);
+          if (coverage <= 0.) discard;
           float wireOxide = .5 + .5 * wireFilteredSine(vWireWorld.x * 2100. + wireFilteredSine(vWireWorld.y * 1440.));
-          float wirePitting = .5 + .5 * wireFilteredSine(vWireWorld.y * 9200. + vWireWorld.x * 7600.);
-          roughnessFactor = clamp(uWireRoughness + uWirePatina * wireOxide * .25 + wirePitting * .04, .08, .95);
-          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.17, .19, .16), uWirePatina * wireOxide * .45);
+          float pitting = .5 + .5 * wireFilteredSine(vWireWorld.y * 9200. + vWireWorld.x * 7600.);
+          roughnessFactor = clamp(uWireRoughness + uWirePatina * wireOxide * ${galvanized ? '.25 + pitting * .04' : '.23 + pitting * .025'}, .08, .95);
+          diffuseColor.rgb = mix(diffuseColor.rgb, ${galvanized ? 'vec3(.17, .19, .16), uWirePatina * wireOxide * .45' : 'vec3(.095, .065, .041), uWirePatina * wireOxide * .65'});
         `)
-        .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor *= 1. - uWirePatina * wireOxide * .35;')
-        .replace('#include <opaque_fragment>', 'outgoingLight *= uWireLightTransmission;\ndiffuseColor.a *= vWireCoverage;\n#include <opaque_fragment>')
+        .replace('#include <metalnessmap_fragment>', `#include <metalnessmap_fragment>\nmetalnessFactor *= 1. - uWirePatina * wireOxide * ${galvanized ? '.35' : '.8'};`)
+        .replace('#include <normal_fragment_begin>', /* glsl */`
+          #include <normal_fragment_begin>
+          float radial = clamp((left + right) * .5 / uWireRadius, -1., 1.);
+          normal = normalize(radial * vWireSide + sqrt(max(0., 1. - radial * radial)) * vWireFront);
+          nonPerturbedNormal = normal;
+        `)
+        .replace('#include <opaque_fragment>', /* glsl */`
+          // Store area coverage for glass filtering. Blending stays off and metal writes depth.
+          gl_FragColor = vec4(outgoingLight * uWireLightTransmission * coverage, coverage);
+        `)
     }
-    m.customProgramCacheKey = () => `embedded-zinc-wire-${beauty}-v3-filtered-coverage`
+    m.customProgramCacheKey = () => `wire-ribbon-${finish}-${beauty}`
   }
   return { material, depth, uniforms }
 }
 
-export function createWireGrid(width = 8, height = width, centerY = 1.8) {
-  const group = new Group(), materials = wireMaterials()
+export function createWireGrid(width = 8, height = width, centerY = 1.8, finish: Finish = 'zinc') {
+  const materials = wireMaterials(finish), metal = finish === 'zinc' ? zinc : iron
   const surfaceGrid = { origin: new Vector2(0, centerY), warp: { value: .00038 * .28 } }
-  const capacity = Math.ceil(Math.max(width, height) / .018) + 3
-  const meshes: InstancedMesh[] = []
-  for (let axis = 0; axis < 2; axis++) {
-    // Round, opaque wire with real cylindrical surface normals and depth.
-    const geometry = new CylinderGeometry(1, 1, 1, 12, 48, true)
-    geometry.setAttribute('wireAxis', new InstancedBufferAttribute(new Float32Array(capacity).fill(axis), 1))
-    const mesh = new InstancedMesh(geometry, materials.material, capacity)
-    mesh.customDepthMaterial = materials.depth
-    mesh.layers.enable(1)
-    let strandCount = 0
-    mesh.onBeforeRender = (_renderer, _scene, camera) => {
-      strandCount = mesh.count
-      if (!camera.layers.isEnabled(1)) mesh.count = 0
-    }
-    mesh.onAfterRender = () => { mesh.count = strandCount }
-    mesh.castShadow = mesh.receiveShadow = true
-    mesh.frustumCulled = false
-    meshes.push(mesh); group.add(mesh)
-  }
+  const capacity = Math.ceil((width + height) / .018) + 2
+  const geometry = new PlaneGeometry(2, 1)
+  const phases = new InstancedBufferAttribute(new Float32Array(capacity), 1)
+  geometry.setAttribute('wirePhase', phases)
+  const mesh = new InstancedMesh(geometry, materials.material, capacity)
+  mesh.count = 0
+  mesh.customDepthMaterial = materials.depth
+  mesh.layers.enable(1)
+  mesh.castShadow = mesh.receiveShadow = true
+  mesh.frustumCulled = false
+  let strandCount = 0
+  // Layer 0 needs wire shadows, but no wire color in the garden refraction source.
+  mesh.onBeforeRender = (_renderer, _scene, camera) => { mesh.count = camera.layers.isEnabled(1) ? strandCount : 0 }
+  mesh.onAfterRender = () => { mesh.count = strandCount }
   const matrix = new Matrix4(), position = new Vector3(), scale = new Vector3(), rotation = new Quaternion()
+  const zAxis = new Vector3(0, 0, 1)
   let construction = ''
   const update = (s: GlassSettings) => {
     materials.material.roughness = s.wireRoughness
@@ -107,34 +124,33 @@ export function createWireGrid(width = 8, height = width, centerY = 1.8) {
     surfaceGrid.warp.value = s.wireRadius * .28
     materials.uniforms.uWireRoughness.value = s.wireRoughness
     materials.uniforms.uWirePatina.value = s.wirePatina
-    const entryF0 = dielectricFresnel(1, 1, s.ior)
-    materials.uniforms.uWireLightTransmission.value = 1 - entryF0
-    materials.material.color.setRGB(...zinc.n.map((n, i) => conductorF0(n, zinc.k[i], s.ior)) as [number, number, number])
+    materials.uniforms.uWireLightTransmission.value = 1 - dielectricFresnel(1, 1, s.ior)
+    materials.material.color.setRGB(...metal.n.map((n, i) => conductorF0(n, metal.k[i], s.ior)) as [number, number, number])
     const key = [s.wireSpacing, s.wireRadius, s.thickness, s.wireDepth, s.relief, s.rearRelief].join('/')
     if (key === construction) return
     construction = key
     const depth = embeddedWireDepth(s.thickness, s.wireRadius, s.wireDepth, s.relief, s.rearRelief)
+    strandCount = 0
     for (let axis = 0; axis < 2; axis++) {
-      const mesh = meshes[axis]
-      const halfCount = Math.floor(((axis === 0 ? width : height) - 2 * s.wireRadius) / (2 * s.wireSpacing)), count = halfCount * 2 + 1
-      rotation.setFromAxisAngle(new Vector3(0, 0, 1), axis === 0 ? 0 : -Math.PI / 2)
+      const span = axis === 0 ? width : height
+      const halfCount = Math.floor((span / 2 - s.wireRadius) / s.wireSpacing)
+      rotation.setFromAxisAngle(zAxis, axis === 0 ? 0 : -Math.PI / 2)
       scale.set(s.wireRadius, axis === 0 ? height : width, s.wireRadius)
-      for (let i = 0; i < count; i++) {
-        const p = (i - halfCount) * s.wireSpacing
-        // Slightly interpenetrating layers form the welded intersections.
-        position.set(axis === 0 ? p : 0, axis === 0 ? centerY : p + centerY,
-          -depth + (axis === 0 ? 1 : -1) * s.wireRadius * .55)
-        matrix.compose(position, rotation, scale)
-        mesh.setMatrixAt(i, matrix)
+      // The nearer family is first, so depth testing rejects covered crossings.
+      for (let i = -halfCount; i <= halfCount; i++) {
+        const p = i * s.wireSpacing
+        position.set(axis === 0 ? p : 0, axis === 0 ? centerY : p + centerY, -depth + (axis === 0 ? .55 : -.55) * s.wireRadius)
+        mesh.setMatrixAt(strandCount, matrix.compose(position, rotation, scale))
+        phases.setX(strandCount, finish === 'iron' ? ((i + halfCount) * 2.399963 + axis * 1.71) % (2 * Math.PI) : 0)
+        strandCount++
       }
-      mesh.count = count; mesh.instanceMatrix.needsUpdate = true
     }
+    mesh.count = strandCount
+    mesh.instanceMatrix.needsUpdate = true
+    phases.needsUpdate = true
   }
   return {
-    group, materials, meshes, update, surfaceGrid,
-    dispose() {
-      meshes.forEach(mesh => { mesh.geometry.dispose(); mesh.dispose() })
-      materials.material.dispose(); materials.depth.dispose()
-    },
+    mesh, materials, update, surfaceGrid,
+    dispose() { mesh.dispose(); geometry.dispose(); materials.material.dispose(); materials.depth.dispose() },
   }
 }

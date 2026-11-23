@@ -1,6 +1,6 @@
 import {
   BackSide, BoxGeometry, Color, CubeCamera, CylinderGeometry, DirectionalLight, Group, HalfFloatType,
-  HemisphereLight, LatheGeometry, Mesh, MeshBasicMaterial, MeshStandardMaterial, PlaneGeometry,
+  HemisphereLight, InstancedMesh, LatheGeometry, Matrix4, Mesh, MeshBasicMaterial, MeshStandardMaterial, PlaneGeometry,
   PMREMGenerator, Scene, Shape, ShapeGeometry, Vector2, Vector3, WebGLCubeRenderTarget,
 } from 'three'
 import type { WebGLRenderer } from 'three'
@@ -59,7 +59,18 @@ export function createArchitecture(arrangement: Arrangement = 'original') {
   const clay = new MeshStandardMaterial({ color: '#654332', roughness: .94, bumpMap: plaster, bumpScale: .008 })
   const soil = new MeshStandardMaterial({ color: '#252c1d', roughness: 1, bumpMap: plaster, bumpScale: .02 })
   const geometries: (BoxGeometry | PlaneGeometry | LatheGeometry | CylinderGeometry | ShapeGeometry)[] = []
+  const batches: InstancedMesh[] = [], steelMembers: Matrix4[] = []
+  function addBatch(geometry: BoxGeometry | LatheGeometry | CylinderGeometry, material: MeshStandardMaterial, transforms: Matrix4[], castShadow = true) {
+    const mesh = new InstancedMesh(geometry, material, transforms.length)
+    transforms.forEach((transform, index) => mesh.setMatrixAt(index, transform))
+    mesh.castShadow = castShadow; mesh.receiveShadow = true
+    group.add(mesh); batches.push(mesh); geometries.push(geometry)
+  }
   const box = (width: number, height: number, depth: number, x: number, y: number, z: number, material = steel) => {
+    if (material === steel) {
+      steelMembers.push(new Matrix4().makeScale(width, height, depth).setPosition(x, y, z))
+      return
+    }
     const geometry = new BoxGeometry(width, height, depth), mesh = new Mesh(geometry, material)
     mesh.position.set(x, y, z); mesh.castShadow = mesh.receiveShadow = true
     group.add(mesh); geometries.push(geometry)
@@ -90,19 +101,20 @@ export function createArchitecture(arrangement: Arrangement = 'original') {
   box(8, .07, .16, 0, 3.38, -2.6)
   box(20, .1, 10, 0, -.14, -2, soil)
   for (let x = -5; x <= 5; x += 1.15) box(.06, .1, 7, x, 3.6, -1)
-  const profile = [new Vector2(.13, 0), new Vector2(.15, .025), new Vector2(.215, .36), new Vector2(.23, .37), new Vector2(.23, .41), new Vector2(.205, .41), new Vector2(.20, .36)]
-  const potGeometry = new LatheGeometry(profile, 36), dirtGeometry = new CylinderGeometry(.2, .2, .02, 32)
-  geometries.push(potGeometry, dirtGeometry)
-  for (const [x, z, scale] of arrangement === 'original' ? [[.78, -.38, 1], [-.87, -.56, .8], [1.7, -1.3, 1.3], [-.5, -.3, .7], [-2.1, -1.2, 1.2]] : []) {
-    const pot = new Mesh(potGeometry, clay), dirt = new Mesh(dirtGeometry, soil)
-    pot.position.set(x, -.11, z); pot.scale.setScalar(scale)
-    dirt.position.set(x, -.11 + .37 * scale, z); dirt.scale.setScalar(scale)
-    pot.castShadow = pot.receiveShadow = dirt.receiveShadow = true
-    group.add(pot, dirt)
+  addBatch(new BoxGeometry(), steel, steelMembers)
+  if (arrangement === 'original') {
+    const profile = [new Vector2(.13, 0), new Vector2(.15, .025), new Vector2(.215, .36), new Vector2(.23, .37), new Vector2(.23, .41), new Vector2(.205, .41), new Vector2(.20, .36)]
+    const pots: Matrix4[] = [], dirt: Matrix4[] = []
+    for (const [x, z, scale] of [[.78, -.38, 1], [-.87, -.56, .8], [1.7, -1.3, 1.3], [-.5, -.3, .7], [-2.1, -1.2, 1.2]]) {
+      pots.push(new Matrix4().makeScale(scale, scale, scale).setPosition(x, -.11, z))
+      dirt.push(new Matrix4().makeScale(scale, scale, scale).setPosition(x, -.11 + .37 * scale, z))
+    }
+    addBatch(new LatheGeometry(profile, 36), clay, pots)
+    addBatch(new CylinderGeometry(.2, .2, .02, 32), soil, dirt, false)
   }
   return {
     group,
-    dispose() { geometries.forEach(geometry => geometry.dispose()); [wall, recess, steel, clay, soil].forEach(material => material.dispose()); plaster.dispose() },
+    dispose() { batches.forEach(batch => batch.dispose()); geometries.forEach(geometry => geometry.dispose()); [wall, recess, steel, clay, soil].forEach(material => material.dispose()); plaster.dispose() },
   }
 }
 

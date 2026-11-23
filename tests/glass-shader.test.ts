@@ -31,7 +31,7 @@ function programs(earlier = false, earlierLook = false, breeze = false) {
     { name: 'leaf shadow', material: foliage.depth, source: ShaderLib.depth, defines: '#define USE_INSTANCING\n#define DEPTH_PACKING 3201\n' },
     { name: 'stem', material: foliage.stem, source: ShaderLib.standard, defines: '#define USE_SHADOWMAP\n' },
     { name: 'stem shadow', material: foliage.stemDepth, source: ShaderLib.depth, defines: '#define DEPTH_PACKING 3201\n' },
-    { name: 'cylindrical wire', material: wire.material, source: ShaderLib.standard, defines: '#define USE_INSTANCING\n#define USE_SHADOWMAP\n' },
+    { name: 'wire ribbon', material: wire.material, source: ShaderLib.standard, defines: '#define USE_INSTANCING\n#define USE_SHADOWMAP\n' },
     { name: 'wire shadow', material: wire.depth, source: ShaderLib.depth, defines: '#define USE_INSTANCING\n#define DEPTH_PACKING 3201\n' },
   ]
   const counts = '#define NUM_DIR_LIGHTS 2\n#define NUM_POINT_LIGHTS 0\n#define NUM_SPOT_LIGHTS 0\n#define NUM_RECT_AREA_LIGHTS 0\n#define NUM_HEMI_LIGHTS 1\n#define NUM_DIR_LIGHT_SHADOWS 1\n#define NUM_POINT_LIGHT_SHADOWS 0\n#define NUM_SPOT_LIGHT_SHADOWS 0\n#define NUM_SPOT_LIGHT_MAPS 0\n#define NUM_SPOT_LIGHT_COORDS 0\n#define NUM_SPOT_LIGHT_SHADOWS_WITH_MAPS 0\n#define SHADOWMAP_TYPE_PCF_SOFT\n'
@@ -79,6 +79,8 @@ describe('greenhouse shader source', () => {
   })
   for (const earlier of [false, true]) for (const program of programs(earlier)) {
     for (const stage of ['vertex', 'fragment'] as const) it(`parses the expanded ${earlier ? 'earlier ' : ''}${program.name} ${stage} shader`, () => {
+      // The test preprocessor accepts mid-line directives that WebGL rejects.
+      expect(program[stage]).not.toMatch(/[;}][ \t]*#\s*(?:define|if|include)\b/)
       expect(() => parse(preprocess(program[stage]), { stage, quiet: true, grammarSource: `glass-${program.name}.${stage}` })).not.toThrow()
     })
   }

@@ -69,7 +69,9 @@ describe('independent greenhouse versions', () => {
   it('restores the earlier two-shape planting and byte-precision glass maps', () => {
     const foliage = createFoliage(), map = rolledGlassTexture(32)
     try {
-      expect(foliage.leafCount).toBe(1161)
+      expect(foliage.plants).toHaveLength(23)
+      expect(foliage.leafCount).toBe(989)
+      expect(foliage.rain.blades).toHaveLength(foliage.leafCount)
       expect(foliage.group.children.length).toBe(3)
       expect(map.type).toBe(UnsignedByteType)
       expect(map.image.data).toBeInstanceOf(Uint8Array)
@@ -116,7 +118,7 @@ describe('independent greenhouse versions', () => {
   it('layers new near and distant foliage while keeping the old planting and darker broken backdrop selectable', () => {
     const original = createFoliage('original'), canopy = createFoliage('canopy-v1'), backdrop = createArchitecture('canopy')
     try {
-      expect(original.leafCount).toBe(1161)
+      expect(original.leafCount).toBe(989)
       expect(canopy.leafCount).toBeGreaterThan(original.leafCount)
       expect(canopy.leaves.some(leaf => leaf.position.y > 2.5 && leaf.position.z > -.2)).toBe(true)
       expect(canopy.leaves.some(leaf => leaf.position.y < 1.2 && leaf.position.z > -.2)).toBe(true)

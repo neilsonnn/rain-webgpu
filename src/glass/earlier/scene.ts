@@ -1,7 +1,7 @@
 import { createRenderTimer } from '../performance'
 import {
   ACESFilmicToneMapping, Color, DepthTexture, HalfFloatType, LinearMipmapLinearFilter,
-  MOUSE, PCFSoftShadowMap, PerspectiveCamera, Scene, SRGBColorSpace,
+  BasicShadowMap, DoubleSide, MOUSE, Mesh, MeshNormalMaterial, PCFShadowMap, PCFSoftShadowMap, PerspectiveCamera, Scene, SRGBColorSpace,
   Spherical, UnsignedIntType, Vector2, Vector3, WebGLRenderer, WebGLRenderTarget,
 } from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
@@ -21,8 +21,8 @@ import type { SceneArrangement } from './arrangements'
 import { createPane } from './pane'
 import { SoftOrbitControls } from '../orbit'
 import { createStorm } from '../rain/storm'
-import { createRainHanging } from '../rain/storm/hanging'
 import { attachWaterTouch } from '../rain/touch'
+import { defaultQuality, qualityLevels, supportedWireSamples, supportedLevel, type GpuQuality } from '../quality'
 
 export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSettings }, onReady: () => void, onFailure: (message: string) => void, options: GlassSceneOptions = {}) {
   // Capture the current controls before any hot refresh or renderer rebuild.
@@ -44,6 +44,7 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
   host.appendChild(renderer.domElement)
 
   const garden = new Scene(), surface = new Scene(), frontRain = new Scene()
+  const meshMaterial = new MeshNormalMaterial({ side: DoubleSide })
   garden.background = new Color(composition.background)
   const camera = new PerspectiveCamera(48, 1, .05, 60)
   const gardenCamera = camera.clone()
@@ -52,8 +53,8 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
   const orbitCamera = camera.clone()
   orbitCamera.position.set(0, 1.8, 2.25)
   if (options.standalone) {
-    // Begin moderately left and slightly above, at the same zoom distance.
-    const radius = 2.65, yaw = -.22, pitch = Math.PI / 2 - .06
+    // Look up and right across the pane from a closer, lower-left orbit.
+    const radius = 2.12, yaw = -.36, pitch = Math.PI / 2 + .19
     orbitCamera.position.set(
       radius * Math.sin(pitch) * Math.sin(yaw),
       1.8 + radius * Math.cos(pitch),
@@ -82,13 +83,18 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
     depthTexture: gardenDepth,
   })
   const wireDepth = new DepthTexture(1, 1, UnsignedIntType)
+  const gl = renderer.getContext() as WebGL2RenderingContext
+  const colorSamples = gl.getInternalformatParameter(gl.RENDERBUFFER, gl.RGBA16F, gl.SAMPLES)
+  const depthSamples = gl.getInternalformatParameter(gl.RENDERBUFFER, gl.DEPTH_COMPONENT24, gl.SAMPLES)
+  const wireLevels = supportedWireSamples(colorSamples, depthSamples)
+  const filterLevels = qualityLevels.reliefFilter.filter(n => n <= Math.max(1, renderer.capabilities.getMaxAnisotropy()))
+  options.onQualityCaps?.({ wireSamples: wireLevels, reliefFilter: filterLevels })
   const wireTarget = new WebGLRenderTarget(1, 1, {
-    type: HalfFloatType, samples: Math.min(4, renderer.capabilities.maxSamples), depthTexture: wireDepth,
+    type: HalfFloatType, depthTexture: wireDepth,
     minFilter: LinearMipmapLinearFilter, generateMipmaps: true,
   })
   const composite = new WebGLRenderTarget(1, 1, { type: HalfFloatType, depthBuffer: true })
   const relief = rolledGlassTexture(), rearRelief = rolledGlassTexture(768, 7391)
-  relief.anisotropy = rearRelief.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy())
   const wire = composition.pane ? createWireGrid(composition.pane.width, composition.pane.height, composition.pane.centerY) : createWireGrid()
   const glass = createGlassMaterial(target.texture, gardenDepth, relief, rearRelief, wireTarget.texture, wireDepth, composition.pane ? wire.surfaceGrid : undefined)
   const grading = createGrading(composite.texture), pane = createPane(glass.material, composition.pane)
@@ -97,11 +103,10 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
   const springFoliage = composition.motion === 'split' ? createSpringFoliage({
     garden: growGarden(arrangement, 'left'), textures: leafTextures, geometry: leafGeometry, earlierLook: true, windScale: composition.windScale,
   }) : undefined
-  const hanging = createRainHanging()
-  const rain = createStorm(renderer, foliage.rain, hanging, () => settings.current, composition.pane, () => {
+  const rain = createStorm(renderer, foliage.rain, () => settings.current, composition.pane, () => {
     if (rain.backend !== 'starting') options.onRainBackend?.(rain.backend)
     invalidate()
-  }, options.timings, { adapter: options.gpuAdapter, terrain: {texture:relief,grid:wire.surfaceGrid}, onFailure: message => { waterTouch.suspend(); failure(message) } })
+  }, options.timings, { adapter: options.gpuAdapter, terrain: {texture:relief,grid:wire.surfaceGrid}, onBrushHits: options.onBrushHits, onFailure: message => { waterTouch.suspend(); failure(message) } })
   frontRain.add(rain.front); garden.add(rain.mesh)
   glass.uniforms.uRainWater.value = rain.surface.texture
   glass.uniforms.uRainBounds.value.copy(rain.surface.bounds)
@@ -110,14 +115,13 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
   const lights = greenhouseLights(arrangement), surfaceLights = greenhouseLights(arrangement)
   surfaceLights.sun.castShadow = surfaceLights.fill.castShadow = false
   lights.group.traverse(object => object.layers.enable(1))
-  garden.add(foliage.group, architecture.group, lights.group, wire.group, hanging.group)
+  garden.add(foliage.group, architecture.group, lights.group, wire.mesh)
   if (springFoliage) garden.add(springFoliage.group)
   surface.add(surfaceLights.group)
   const drySun = lights.sun.intensity, drySurfaceSun = surfaceLights.sun.intensity
   let environment: WebGLRenderTarget | undefined
   let stopped = false, disposed = false, ready = false, frame = 0, time = 12, previous = 0
-  let suspended = Boolean(options.suspended)
-  let lastWidth = 1, lastHeight = 1
+  let lastWidth = 0, lastHeight = 0
   let savedSettings = settings.current
   const pointer = new Vector2(), smoothPointer = new Vector2(), drawingSize = new Vector2(), look = new Vector3()
   const failure = (message: string) => { stopped = true; cancelAnimationFrame(frame); onFailure(message) }
@@ -128,17 +132,32 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
     try { renderer.render(frontRain, camera) }
     finally { renderer.autoClear = clear; renderer.shadowMap.autoUpdate = shadows }
   }
+  const drawMeshes = () => {
+    const shadows = renderer.shadowMap.autoUpdate, rainVisible = rain.mesh.visible
+    garden.overrideMaterial = meshMaterial
+    renderer.shadowMap.autoUpdate = false
+    rain.mesh.visible = false
+    try {
+      renderer.setRenderTarget(null)
+      renderer.render(garden, camera)
+    } finally {
+      garden.overrideMaterial = null
+      renderer.shadowMap.autoUpdate = shadows
+      rain.mesh.visible = rainVisible
+    }
+  }
   renderer.debug.onShaderError = (context, program, vertex, fragment) => {
     console.error('Greenhouse shader failed.', context.getProgramInfoLog(program), context.getShaderInfoLog(vertex), context.getShaderInfoLog(fragment))
     failure('The glass shader could not run on this device. Try reloading the scene.')
   }
+  const pixelRatio = () => options.quality?.current.pixelRatio || window.devicePixelRatio || 1
   const resize = () => {
-    if (suspended) return
-    const { width, height } = host.getBoundingClientRect()
-    lastWidth = Math.max(1, width); lastHeight = Math.max(1, height)
-    renderer.setPixelRatio(window.devicePixelRatio || 1)
-    renderer.setSize(lastWidth, lastHeight, false)
-    renderer.getDrawingBufferSize(drawingSize)
+    const bounds = renderer.domElement.getBoundingClientRect()
+    const width = Math.max(1, bounds.width), height = Math.max(1, bounds.height), ratio = pixelRatio()
+    if (width === lastWidth && height === lastHeight && ratio === renderer.getPixelRatio()) return
+    lastWidth = width; lastHeight = height
+    renderer.setDrawingBufferSize(width, height, ratio)
+    drawingSize.set(gl.drawingBufferWidth, gl.drawingBufferHeight)
     target.setSize(drawingSize.x, drawingSize.y)
     wireTarget.setSize(drawingSize.x, drawingSize.y); composite.setSize(drawingSize.x, drawingSize.y)
     glass.uniforms.uGlassResolution.value.copy(drawingSize)
@@ -149,15 +168,48 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
     // Preserve the composition's width on narrow screens without stretching it.
     camera.fov = Math.atan(Math.tan(24 * Math.PI / 180) / Math.min(1, camera.aspect)) * 360 / Math.PI
     camera.updateProjectionMatrix()
+    options.onRenderSize?.(drawingSize.x, drawingSize.y)
   }
   const renderTimer = createRenderTimer(renderer, options.timings)
   const glassTimer = createRenderTimer(renderer, options.timings, 'glassGpu')
+  let appliedQuality: GpuQuality | undefined
+  function applyQuality(q: GpuQuality) {
+    glass.setQuality(q)
+    const anisotropy = supportedLevel(q.reliefFilter, filterLevels)
+    for (const map of [relief, rearRelief]) if (map.anisotropy !== anisotropy) {
+      map.anisotropy = anisotropy; map.needsUpdate = true
+    }
+    const wireCount = supportedLevel(q.wireSamples, wireLevels)
+    const samples = wireCount === 1 ? 0 : wireCount
+    if (wireTarget.samples !== samples) {
+      wireTarget.dispose()
+      wireTarget.samples = samples
+    }
+    const filter = q.shadowTaps === 1 ? BasicShadowMap : q.shadowTaps === 17 ? PCFShadowMap : PCFSoftShadowMap
+    if (renderer.shadowMap.type !== filter) {
+      renderer.shadowMap.type = filter
+      garden.traverse(object => {
+        if (object instanceof Mesh && object.receiveShadow) {
+          for (const material of Array.isArray(object.material) ? object.material : [object.material]) material.needsUpdate = true
+        }
+      })
+    }
+    for (const light of [lights.sun, lights.fill]) {
+      const side = Math.min(renderer.capabilities.maxTextureSize, light === lights.sun ? q.shadowSize / 2 : q.shadowSize)
+      light.shadow.mapSize.set(side, side)
+      light.shadow.map?.setSize(side, side)
+    }
+    glass.uniforms.uRainTexel.value = 1 / q.waterSize
+    appliedQuality = q
+  }
   let sampleGlass = false
   const draw = (now: number) => {
     frame = 0
-    if (disposed || stopped || suspended || document.hidden) { previous = 0; return }
-    if (renderer.getPixelRatio() !== (window.devicePixelRatio || 1)) resize()
+    if (disposed || stopped || document.hidden) { previous = 0; return }
+    if (renderer.getPixelRatio() !== pixelRatio()) resize()
     const s = settings.current, elapsed = previous ? (now - previous) / 1000 : 0
+    const quality = options.quality?.current ?? defaultQuality
+    if (quality !== appliedQuality) applyQuality(quality)
     if (s !== savedSettings) { if (!options.standalone) saveGlassSettings(s); savedSettings = s }
     previous = now
     controls.update(elapsed || 1 / 60)
@@ -165,7 +217,7 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
     const detailed = options.timings?.expanded
     let simStart = detailed ? performance.now() : 0
     waterTouch.update(now, options.centerTaps?.current ?? false)
-    rain.update(s.playing ? Math.min(elapsed, .05) : 0, s, time)
+    rain.update(s.playing ? Math.min(elapsed, .05) : 0, s, time, quality)
     let simulationMs = detailed ? performance.now() - simStart : 0
     host.dataset.rainBackend = rain.backend
     if (s.playing) smoothPointer.lerp(pointer, 1 - Math.exp(-Math.min(elapsed || .016, .05) * 1.5))
@@ -181,8 +233,9 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
     camera.lookAt(look)
     camera.rotateZ(rain.shake.roll)
     camera.updateMatrixWorld()
-    const paneSide = composition.pane && camera.position.z < -s.thickness * .5 ? -1 : 1
-    glass.uniforms.uPaneSide.value = paneSide
+    const profileView = options.profileView?.current ?? 'scene'
+    const showPane = s.glass && profileView === 'scene'
+    const drawGlassFace = showPane && camera.position.z > 0
     pane.update(s)
     // A wider source view provides real scene data beyond the visible edges
     // for strongly scattered rays, without enlarging the rendering budget.
@@ -205,38 +258,37 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
     if (detailed && springFoliage) simulationMs += performance.now() - simStart
     glass.uniforms.uGlassRelief.value = s.relief
     glass.uniforms.uTextureScale.value = s.textureScale
-    glass.uniforms.uGlassDiffusion.value = paneSide > 0 ? s.diffusion : s.surfaceRoughness
-    glass.uniforms.uFrontRoughness.value = paneSide > 0 ? s.surfaceRoughness : s.diffusion
+    glass.uniforms.uGlassDiffusion.value = s.diffusion
+    glass.uniforms.uFrontRoughness.value = s.surfaceRoughness
     glass.uniforms.uGridPitch.value = s.wireSpacing
     glass.uniforms.uGridRelief.value = s.gridRelief; glass.uniforms.uGridWidth.value = s.gridWidth
     glass.uniforms.uGridPebbling.value = s.gridPebbling
     glass.uniforms.uEmbeddedMesh.value = Number(s.embeddedMesh)
     glass.uniforms.uRearRelief.value = s.rearRelief
     glass.uniforms.uPaneThickness.value = s.thickness
-    const embedDepth = embeddedWireDepth(s.thickness, s.wireRadius, s.wireDepth, s.relief, s.rearRelief)
-    glass.uniforms.uWireDepth.value = paneSide > 0 ? embedDepth : s.thickness - embedDepth
+    glass.uniforms.uWireDepth.value = embeddedWireDepth(s.thickness, s.wireRadius, s.wireDepth, s.relief, s.rearRelief)
     glass.uniforms.uDepthStrength.value = s.depthStrength; glass.uniforms.uDepthScale.value = s.depthScale
     glass.uniforms.uDepthCurve.value = s.depthCurve; glass.uniforms.uClearDepth.value = s.clearDepth
-    glass.material.roughness = paneSide > 0 ? s.surfaceRoughness : s.diffusion
+    glass.material.roughness = s.surfaceRoughness
     glass.material.ior = s.ior
-    wire.update(s); wire.group.visible = s.glass && s.embeddedMesh
-    // Coverage blending needs the rear strand family first at intersections.
-    wire.meshes.forEach((mesh, axis) => { mesh.renderOrder = axis === (paneSide > 0 ? 0 : 1) ? 1 : 0 })
+    wire.update(s); wire.mesh.visible = showPane && s.embeddedMesh
     const interfaceTransmission = 1 - dielectricFresnel(1, 1, s.ior)
     lights.fill.intensity = composition.fill * (s.glass ? interfaceTransmission ** 2 * Math.exp(-1.02 * s.thickness) : 1)
     grading.update(s)
     renderer.toneMappingExposure = s.exposure
     if (detailed) {
-      if (!s.glass && options.timings) options.timings.glassGpu = undefined
-      sampleGlass = s.glass && !sampleGlass
+      if (!drawGlassFace && options.timings) options.timings.glassGpu = undefined
+      sampleGlass = drawGlassFace && !sampleGlass
       if (!sampleGlass) renderTimer.begin(now)
     }
     const renderStart = detailed ? performance.now() : 0
     try {
-      rain.renderWater()
-      glass.uniforms.uRainWater.value = rain.surface.texture
-      glass.uniforms.uRainBounds.value.copy(rain.surface.bounds)
-      if (s.glass) {
+      if (profileView === 'meshes') {
+        drawMeshes()
+      } else if (drawGlassFace) {
+        rain.renderWater()
+        glass.uniforms.uRainWater.value = rain.surface.texture
+        glass.uniforms.uRainBounds.value.copy(rain.surface.bounds)
         // Keep full geometric wire shadows while excluding its surface from the
         // garden color/depth. Its optical depth must not share the foliage blur.
         renderer.setRenderTarget(target)
@@ -261,7 +313,7 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
         if (composition.pane) {
           // The unfiltered garden remains visible outside the cut pane. Its
           // depth also occludes glass when orbiting behind the foliage.
-          wire.group.visible = false
+          wire.mesh.visible = false
           renderer.shadowMap.autoUpdate = false
           renderer.render(garden, camera)
           renderer.autoClear = false
@@ -270,15 +322,22 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
         try { renderer.render(surface, camera) }
         finally {
           glassTimer.end()
-          renderer.autoClear = true; renderer.shadowMap.autoUpdate = true; wire.group.visible = s.embeddedMesh
+          renderer.autoClear = true; renderer.shadowMap.autoUpdate = true; wire.mesh.visible = s.embeddedMesh
         }
       } else {
         renderer.setRenderTarget(composite)
         renderer.render(garden, camera)
+        if (showPane && pane.edges) {
+          // Only the cut edges are visible from behind. No refraction targets.
+          renderer.autoClear = false
+          try { renderer.render(surface, camera) } finally { renderer.autoClear = true }
+        }
       }
-      drawFrontRain()
-      renderer.setRenderTarget(null)
-      grading.render(renderer)
+      if (profileView !== 'meshes') {
+        drawFrontRain()
+        renderer.setRenderTarget(null)
+        grading.render(renderer)
+      }
     } catch (reason) {
       console.error('Greenhouse rendering failed.', reason)
       renderer.setRenderTarget(null)
@@ -291,7 +350,7 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
     else previous = 0
   }
   const invalidate = () => {
-    if (!frame && !disposed && !stopped && !suspended && !document.hidden) frame = requestAnimationFrame(draw)
+    if (!frame && !disposed && !stopped && !document.hidden) frame = requestAnimationFrame(draw)
   }
   const visibility = () => {
     cancelAnimationFrame(frame); frame = 0; previous = 0
@@ -325,7 +384,7 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
       controls.update()
     }
     invalidate()
-  }, options.onWaterFlow)
+  })
   const dispose = () => {
     if (disposed) return
     renderTimer.dispose(); glassTimer.dispose()
@@ -338,10 +397,10 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
     document.removeEventListener('visibilitychange', visibility)
     host.removeEventListener('pointermove', move); host.removeEventListener('pointerleave', leave)
     renderer.domElement.removeEventListener('webglcontextlost', lost)
-    rain.dispose(); hanging.dispose(); foliage.dispose(); springFoliage?.dispose(); architecture.dispose(); lights.dispose(); surfaceLights.dispose(); wire.dispose(); grading.dispose()
+    rain.dispose(); foliage.dispose(); springFoliage?.dispose(); architecture.dispose(); lights.dispose(); surfaceLights.dispose(); wire.dispose(); grading.dispose()
     delete host.dataset.rainBackend
     environment?.dispose(); target.dispose(); wireTarget.dispose(); composite.dispose()
-    relief.dispose(); rearRelief.dispose(); pane.dispose(); glass.material.dispose()
+    relief.dispose(); rearRelief.dispose(); pane.dispose(); glass.material.dispose(); meshMaterial.dispose()
     renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove()
   }
   try {
@@ -376,11 +435,5 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
     controls.update(); controls.enableDamping = true
     invalidate()
   }
-  const setSuspended = (value: boolean) => {
-    if (disposed || suspended === value) return
-    suspended = value; cancelAnimationFrame(frame); frame = 0; previous = 0
-    if (value) waterTouch.suspend()
-    else { resize(); invalidate() }
-  }
-  return { invalidate, dispose, resetView, getView, setView, setSuspended }
+  return { invalidate, dispose, resetView, getView, setView }
 }

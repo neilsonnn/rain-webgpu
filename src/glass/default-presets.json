@@ -33,7 +33,6 @@
     "rainParticles": 1,
     "rainSpray": 2.5,
     "rainShake": 0,
-    "rainChainFlow": 1,
     "rainMainBranchStiffness": 8,
     "rainBranchStiffness": 1.19,
     "rainShutter": 6,

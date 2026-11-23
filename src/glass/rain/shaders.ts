@@ -15,7 +15,7 @@ float paneWaterHeightAt(vec2 uv) {
   return dot(encoded, vec2(256.,1.)) * (255. / 65535.) * .064;
 }
 vec4 paneRainField(vec2 point) {
-  if (uRainWetness < .0001 || uPaneSide < 0.) return vec4(0.);
+  if (uRainWetness < .0001) return vec4(0.);
   vec2 uv = (point - uRainBounds.xy) / uRainBounds.zw;
   vec2 tap = max(vec2(uRainTexel), fwidth(uv));
   if (any(lessThan(uv, vec2(0.))) || any(greaterThan(uv, vec2(1.)))) return vec4(0.);

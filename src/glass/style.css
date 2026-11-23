@@ -1,5 +1,5 @@
-.glass-experiment { --glass-padding: clamp(16px, 2vmin, 28px); position: fixed; inset: 0; overflow: hidden; background: #000; color: #e7e9db; font: 11px/1.5 var(--font-mono); letter-spacing: -.025em; }
-.glass-canvas { position: absolute; inset: var(--glass-padding); overflow: hidden; border: 1px solid rgb(231 233 219 / 10%); border-radius: 0; opacity: 0; transition: opacity 1.4s ease; }
+.glass-experiment { position: fixed; inset: 0; overflow: hidden; background: #000; color: #e7e9db; font: 11px/1.5 var(--font-mono); letter-spacing: -.025em; }
+.glass-canvas { position: absolute; inset: 0; overflow: hidden; opacity: 0; transition: opacity 1.4s ease; }
 .glass-canvas canvas { display: block; width: 100%; height: 100%; cursor: grab; }
 .glass-canvas.glass-water-mode canvas { cursor: crosshair; }
 .glass-canvas.glass-orbiting canvas { cursor: grabbing; }
@@ -85,20 +85,34 @@
   .glass-audio-error { right: 20px; bottom: 84px; }
 }
 
-.glass-rain-toggle { position: absolute; z-index: 6; left: calc(max(20px, env(safe-area-inset-left)) + 96px); bottom: max(20px, env(safe-area-inset-bottom)); display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 8px 11px; border: 1px solid #e5ebd52b; border-radius: 5px; background: #132018b8; color: #e7e9db; backdrop-filter: blur(14px); cursor: pointer; }
-.glass-rain-toggle:hover { background: #23382be8; }
-.glass-rain-toggle[aria-pressed="true"] { background: #263d3de8; border-color: #c8e1df66; color: #edf6f2; }
+.glass-rain-toggle { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border-radius: 50%; color: #f2f4e9; }
+.glass-rain-toggle svg { filter: drop-shadow(0 1px 2px #09120de6); }
+@media (hover: hover) { .glass-rain-toggle:hover { background: #101a1580; } }
 
-.glass-tools { position: absolute; z-index: 6; left: max(20px, env(safe-area-inset-left)); bottom: max(20px, env(safe-area-inset-bottom)); display: flex; gap: 6px; }
+.glass-tools { position: absolute; z-index: 6; left: max(20px, env(safe-area-inset-left)); bottom: max(20px, env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 6px; }
 .glass-tools > button { position: static; }
 .glass-fps { position: absolute; z-index: 6; right: max(20px, env(safe-area-inset-right)); bottom: max(20px, env(safe-area-inset-bottom)); font-variant-numeric: tabular-nums; }
 .glass-fps button, .glass-frame-times { border: 1px solid #e5ebd52b; border-radius: 5px; background: #132018d9; color: #e7e9db; backdrop-filter: blur(14px); }
 .glass-fps button { min-height: 36px; padding: 7px 10px; font: inherit; cursor: pointer; }
-.glass-frame-times { position: absolute; right: 0; bottom: calc(100% + 8px); width: min(225px, calc(100vw - 40px)); padding: 13px; }
+.glass-frame-times { position: absolute; right: 0; bottom: calc(100% + 8px); box-sizing: border-box; width: min(290px, calc(100vw - 40px)); max-height: calc(100dvh - 92px - env(safe-area-inset-bottom) - env(safe-area-inset-top)); overflow-y: auto; overscroll-behavior: contain; padding: 13px; background: #132018; backdrop-filter: none; }
 .glass-frame-times dl { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; margin: 0; }
 .glass-frame-times dd { margin: 0; text-align: right; }
 .glass-frame-times p { margin: 9px 0 0; color: #b5c1a8; font-size: 10px; }
+.glass-gpu-quality { margin: 12px 0 0; border: 0; border-top: 1px solid #e5ebd533; padding: 5px 0 0; min-width: 0; }
+.glass-gpu-quality legend { padding-right: 8px; color: #e7e9db; }
+.glass-profile { border: 0; border-bottom: 1px solid #e5ebd533; margin: 0 0 10px; padding: 0 0 8px; min-width: 0; }
+.glass-profile legend { padding: 0 0 4px; color: #e7e9db; }
+.glass-profile label, .glass-render-size { display: flex; align-items: center; gap: 6px; min-height: 24px; }
+.glass-profile input { margin: 0; accent-color: #bbccad; }
+.glass-pixel-ratio, .glass-render-size { justify-content: space-between; }
+.glass-pixel-ratio select { color-scheme: dark; font: inherit; }
+.glass-render-size output { color: #b5c1a8; }
+.glass-gpu-quality label { display: block; margin: 6px 0; }
+.glass-gpu-quality label > span { display: flex; justify-content: space-between; }
+.glass-gpu-quality output { color: #b5c1a8; }
+.glass-gpu-quality input { display: block; width: 100%; height: 18px; margin: 0; accent-color: #bbccad; cursor: pointer; }
+.glass-gpu-quality button { margin-top: 4px; min-height: 26px; padding: 3px 8px; backdrop-filter: none; }
 @media (max-width: 380px) {
   .glass-tools { gap: 3px; }
-  .glass-tools > button, .glass-fps button { padding-inline: 6px; gap: 3px; }
+  .glass-debug-toggle, .glass-fps button { padding-inline: 6px; gap: 3px; }
 }

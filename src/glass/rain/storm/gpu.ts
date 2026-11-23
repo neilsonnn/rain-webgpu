@@ -52,12 +52,12 @@ export async function createGpuStorm(renderer:WebGLRenderer,bounds:Vector4,colli
     const params=buffer('storm controls',512,GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST)
     const particles=buffer('rain spray beads rings and trails',stormCount*48,storage)
     const visible=buffer('live storm draw indices',(4+stormCount-o.spray)*4,storage|GPUBufferUsage.COPY_SRC)
-    const leaves=buffer('moving leaf and sculpture colliders',colliders.data.byteLength,storage)
+    const leaves=buffer('moving leaf colliders',colliders.data.byteLength,storage)
     const heads=buffer('leaf spatial hash',colliders.heads.byteLength,storage)
     const hits=buffer('GPU impact queue',b.hits*48,storage)
     const counters=buffer('pooled storm cursors',64,storage|GPUBufferUsage.COPY_SRC)
-    const events=buffer('leaf and sculpture impact feedback',b.feedback*48,storage|GPUBufferUsage.COPY_SRC)
-    const input=buffer('roof runoff and touch events',commands.byteLength,storage)
+    const events=buffer('leaf impact feedback',b.feedback*48,storage|GPUBufferUsage.COPY_SRC)
+    const input=buffer('leaf runoff and touch events',commands.byteLength,storage)
     const weather=buffer('shared squall density and alias table',squalls.cells.byteLength,storage)
     const landed=buffer('water retained from every pane impact',filmSide*filmSide*4,storage)
     const paneMemory=buffer('bead path anchors and contact history',b.beads*48,storage)
@@ -142,11 +142,11 @@ export async function createGpuStorm(renderer:WebGLRenderer,bounds:Vector4,colli
         commands[at+8]=0;commands[at+9]=0;commands[at+10]=1
         commands[at+11]=Math.min(1.5,Math.sqrt(998*diameter*velocity.z*velocity.z/.072)/35)
       },
-      update(dt:number,time:number,strength:number,s:GlassSettings) {
+      update(dt:number,time:number,strength:number,s:GlassSettings,airFraction=1) {
         if(lost||disposed)return
         quiet=s.rain||commandCount||brushCount?0:quiet+dt
         if((dt<=0&&!brushCount&&!commandCount)||quiet>Math.max(45,s.rainBeadLifetime+s.rainDrying+5))return
-        const active=strength<.0001 ? 0 : Math.round(b.rain*Math.min(1,(.004+.996*strength**1.8)*s.rainParticles))
+        const active=strength<.0001 ? 0 : Math.round(b.rain*airFraction*Math.min(1,(.004+.996*strength**1.8)*s.rainParticles))
         const hasFlight=active>0 || dripCount>0 || population.bound(0)>0
         if(!hasFlight && !previousAir && !commandCount && !s.rain && !population.bound(1) && !population.bound(2) && !population.bound(3)) {
           rendering.setPopulation(0,0,0,0,0); brushCount=0
@@ -184,7 +184,7 @@ export async function createGpuStorm(renderer:WebGLRenderer,bounds:Vector4,colli
         if(tier>canvas.height || smallFrames>=30){
           texture.dispose();canvas.height=tier;texture=atlasTexture();rendering.uniforms.uStormParticles.value=texture;smallFrames=0
         }
-        parameters.set([s.rainDrying,colliders.leafCount,patterCount,patterTotal % 16777216],96)
+        parameters.set([s.rainDrying,0,patterCount,patterTotal % 16777216],96)
         parameters[100]=squalls.phase; parameters[101]=1.25/s.rainSquallSize
         parameters[102]=s.rainBeadChance; parameters[103]=s.rainBeadVelocity
         parameters[104]=s.rainImpactDuration

@@ -184,7 +184,7 @@ for (int paneRay = 0; paneRay < ${GLASS_SAMPLES}; paneRay++) {
   vec3 insideDirection = refract(paneIncident, frontMicroNormal, 1. / material.ior);
   float frontFresnel = paneFresnel(dot(-paneIncident, frontMicroNormal), 1., material.ior);
   float frontWeight = (1. - frontFresnel) * paneMaskingWeight(paneIncident, insideDirection, paneFrontNormal, paneAlpha);
-  // Sample the actual cylindrical wire at its physical position INSIDE the slab.
+  // Sample wire radiance at its embedded depth inside the slab.
   float wireTravel = max(0., (-uWireDepth - paneFrontPoint.z) / min(-.08, insideDirection.z));
   vec3 wirePoint = paneFrontPoint + insideDirection * wireTravel;
   vec2 wireUV = clamp(paneProject(wirePoint), vec2(.001), vec2(.999));

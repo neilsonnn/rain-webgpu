@@ -71,11 +71,10 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
   const lights = greenhouseLights(), surfaceLights = greenhouseLights()
   surfaceLights.sun.castShadow = surfaceLights.fill.castShadow = false
   lights.group.traverse(object => object.layers.enable(1))
-  garden.add(foliage.group, architecture.group, lights.group, wire.group)
+  garden.add(foliage.group, architecture.group, lights.group, wire.mesh)
   surface.add(surfaceLights.group)
   let environment: WebGLRenderTarget | undefined
   let stopped = false, disposed = false, ready = false, frame = 0, time = 12, previous = 0
-  let suspended = Boolean(options.suspended)
   let ratio = Math.min(window.devicePixelRatio || 1, 1.65)
   let slowFrames = 0, observedFrames = 0, lastWidth = 1, lastHeight = 1
   let savedSettings = settings.current
@@ -86,13 +85,13 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
     failure('The glass shader could not run on this device. Try reloading the scene.')
   }
   const resize = () => {
-    if (suspended) return
     const { width, height } = host.getBoundingClientRect()
     lastWidth = Math.max(1, width); lastHeight = Math.max(1, height)
     const budget = Math.sqrt(2400000 / (lastWidth * lastHeight))
     renderer.setPixelRatio(Math.min(ratio, budget))
     renderer.setSize(lastWidth, lastHeight, false)
     renderer.getDrawingBufferSize(drawingSize)
+    wire.materials.uniforms.uWireResolution.value.copy(drawingSize)
     target.setSize(drawingSize.x, drawingSize.y)
     wireTarget.setSize(drawingSize.x, drawingSize.y); composite.setSize(drawingSize.x, drawingSize.y)
     glass.uniforms.uGlassResolution.value.copy(drawingSize)
@@ -106,7 +105,7 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
   const renderTimer = createRenderTimer(renderer, options.timings)
   const draw = (now: number) => {
     frame = 0
-    if (disposed || stopped || suspended || document.hidden) { previous = 0; return }
+    if (disposed || stopped || document.hidden) { previous = 0; return }
     const s = settings.current, elapsed = previous ? (now - previous) / 1000 : 0
     if (s !== savedSettings) { saveGlassSettings(s); savedSettings = s }
     previous = now
@@ -150,7 +149,7 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
     glass.material.roughness = s.surfaceRoughness
     glass.material.ior = s.ior
     glass.material.envMapIntensity = s.reflectionStrength
-    wire.update(s); wire.group.visible = s.glass && s.embeddedMesh
+    wire.update(s); wire.mesh.visible = s.glass && s.embeddedMesh
     architecture.update(s)
     lights.sky.intensity = s.skyFill
     garden.environmentIntensity = s.skyFill * 1.25
@@ -164,13 +163,11 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
       if (s.glass) {
         // Keep full geometric wire shadows while excluding its surface from the
         // garden color/depth. Its optical depth must not share the foliage blur.
-        wire.writeSurface(false)
         renderer.setRenderTarget(target)
         renderer.render(garden, gardenCamera)
         const background = garden.background
         try {
           if (s.embeddedMesh) {
-            wire.writeSurface(true)
             camera.layers.set(1)
             garden.background = null
             renderer.setClearColor(0x000000, 0)
@@ -179,7 +176,6 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
             renderer.render(garden, camera)
           }
         } finally {
-          wire.writeSurface(false)
           camera.layers.set(0)
           garden.background = background
           renderer.setClearColor('#050907', 1)
@@ -212,7 +208,7 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
     else previous = 0
   }
   const invalidate = () => {
-    if (!frame && !disposed && !stopped && !suspended && !document.hidden) frame = requestAnimationFrame(draw)
+    if (!frame && !disposed && !stopped && !document.hidden) frame = requestAnimationFrame(draw)
   }
   const visibility = () => {
     cancelAnimationFrame(frame); frame = 0; previous = 0
@@ -280,10 +276,5 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
     controls.update(); controls.enableDamping = true
     invalidate()
   }
-  const setSuspended = (value: boolean) => {
-    if (disposed || suspended === value) return
-    suspended = value; cancelAnimationFrame(frame); frame = 0; previous = 0
-    if (!value) { resize(); invalidate() }
-  }
-  return { invalidate, dispose, resetView, getView, setView, setSuspended }
+  return { invalidate, dispose, resetView, getView, setView }
 }

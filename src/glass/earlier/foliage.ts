@@ -1,8 +1,9 @@
 import {
-  BufferAttribute, BufferGeometry, CatmullRomCurve3, Color, DoubleSide, DynamicDrawUsage, Group, InstancedBufferAttribute,
+  BufferAttribute, BufferGeometry, Color, DoubleSide, DynamicDrawUsage, Group, InstancedBufferAttribute,
   InstancedMesh, Matrix4, Mesh, MeshDepthMaterial, MeshPhysicalMaterial, MeshStandardMaterial, Quaternion, RGBADepthPacking,
-  TubeGeometry, Vector2, Vector3,
+  Vector2, Vector3,
 } from 'three'
+import { foldedLeaf, stemTube } from '../plant-geometry'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { leafTextures } from './textures'
 import { random } from './settings'
@@ -32,33 +33,10 @@ export interface Leaf {
 }
 export interface Stem { points: Vector3[]; radius: number; plant: number; shoot?: RainShoot }
 
-export function leafGeometry(species = 0, rows = 18, columns = 8) {
-  const positions: number[] = [], uv: number[] = [], indices: number[] = []
-  for (let row = 0; row <= rows; row++) {
-    const t = row / rows
-    const silhouette = Math.pow(Math.max(.0001, Math.sin(Math.PI * t)), species === 2 ? .58 : species === 1 ? .82 : .68)
-      * (species === 2 ? .4 : species === 1 ? .33 : .43) * (1 - t * (species === 2 ? .1 : .25))
-    for (let column = 0; column <= columns; column++) {
-      const s = column / columns * 2 - 1
-      const serration = 1 + .015 * Math.sin(t * Math.PI * 38)
-      const x = s * silhouette * serration
-      const fold = .055 * (1 - Math.abs(s)) * Math.sin(Math.PI * t)
-      const cup = (species === 2 ? -.1 : -.065) * s * s * Math.sin(Math.PI * t)
-      const tip = (species === 2 ? -.18 : -.11) * t * t * t + .018 * Math.sin(t * 8 + s * 2)
-      positions.push(x, t, fold + cup + tip)
-      uv.push(column / columns, t)
-      if (row < rows && column < columns) {
-        const a = row * (columns + 1) + column, b = a + columns + 1
-        indices.push(a, a + 1, b, a + 1, b + 1, b)
-      }
-    }
-  }
-  const geometry = new BufferGeometry()
-  geometry.setAttribute('position', new BufferAttribute(new Float32Array(positions), 3))
-  geometry.setAttribute('uv', new BufferAttribute(new Float32Array(uv), 2))
-  geometry.setIndex(indices)
-  geometry.computeVertexNormals()
-  return geometry
+export function leafGeometry(species = 0) {
+  if (species === 1) return foldedLeaf(.29, .46, .11, .065)
+  if (species === 2) return foldedLeaf(.38, .40, .18, .10)
+  return foldedLeaf(.38, .45, .11, .065)
 }
 
 // A reproducible branching skeleton: leaves and their petioles share the same nodes.
@@ -225,6 +203,9 @@ export function foliageMaterials(maps: ReturnType<typeof leafTextures>, contact 
   return { leaf, depth, stem, stemDepth, uniforms }
 }
 
+// Omit the three outermost left plantings and the one behind the plaster wall.
+const removedOriginalSeeds = new Set([802, 880, 763, 685])
+
 export function growGarden(arrangement: Arrangement = 'original', side?: 'left' | 'right') {
   const composition: SceneArrangement = arrangements[arrangement]
   const leaves: Leaf[] = [], stems: Stem[] = [], plants: PlantBody[] = [], rng = random(8702)
@@ -249,8 +230,11 @@ export function growGarden(arrangement: Arrangement = 'original', side?: 'left' 
   for (let i = 0; i < 18; i++) plantings.push([(rng() - .5) * 10, -.05, -1.2 - rng() * 1.8, 1.1 + rng() * 2.3, i % 2])
   for (let i = 0; i < plantings.length; i++) {
     const [x, y, z, height, species] = plantings[i]
-    const root = new Vector3(x, y, z), plant = growPlant(100 + i * 39, root, height, .5 + rng() * .3, species)
-    if (!composition.mainPlantSeeds || composition.mainPlantSeeds.includes(100 + i * 39)) append(plant, root, height, species)
+    const seed = 100 + i * 39, spread = .5 + rng() * .3
+    if (arrangement === 'original' && removedOriginalSeeds.has(seed)) continue
+    if (composition.mainPlantSeeds && !composition.mainPlantSeeds.includes(seed)) continue
+    const root = new Vector3(x, y, z)
+    append(growPlant(seed, root, height, spread, species), root, height, species)
   }
   for (const planting of composition.plantings) {
     const root = new Vector3(...planting.root)
@@ -333,19 +317,9 @@ export function createFoliage(arrangement: Arrangement = 'original') {
   }
   const rain = createRainPlants(plants, rainBindings, enhanced, stems.flatMap(stem => stem.shoot ? [stem.shoot] : []))
   const tubes = stems.map(stem => {
-    const curve = new CatmullRomCurve3(stem.points), segments = stem.points.length > 3 ? (enhanced ? 24 : 16) : 4, sides = enhanced ? 6 : 4
-    const tube = new TubeGeometry(curve, segments, stem.radius, sides, false)
+    const tube = stemTube(stem.points, stem.radius, enhanced ? .38 : 1)
     if (enhanced) {
-      const positions = tube.getAttribute('position'), vertex = new Vector3(), body = plants[stem.plant]
-      for (let ring = 0; ring <= segments; ring++) {
-        const center = curve.getPointAt(ring / segments), taper = .38 + .62 * (1 - ring / segments) ** .6
-        for (let side = 0; side <= sides; side++) {
-          const index = ring * (sides + 1) + side
-          vertex.fromBufferAttribute(positions, index).sub(center).multiplyScalar(taper).add(center)
-          positions.setXYZ(index, vertex.x, vertex.y, vertex.z)
-        }
-      }
-      tube.computeVertexNormals()
+      const positions = tube.getAttribute('position'), body = plants[stem.plant]
       const anchors = new Float32Array(positions.count * 4)
       for (let i = 0; i < positions.count; i++) anchors.set([body.root.x, body.root.y, body.root.z, body.height], i * 4)
       tube.setAttribute('plantAnchor', new BufferAttribute(anchors, 4))

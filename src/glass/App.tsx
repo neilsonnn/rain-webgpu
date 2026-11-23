@@ -1,8 +1,10 @@
 import { FrameCounter } from './FrameCounter'
 import { FrameTimings } from './performance'
+import { loadQuality, storeQuality, type GpuQuality, type QualityCaps } from './quality'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { SlidersHorizontalIcon } from '@phosphor-icons/react/dist/csr/SlidersHorizontal'
 import { XIcon } from '@phosphor-icons/react/dist/csr/X'
+import { CloudIcon } from '@phosphor-icons/react/dist/csr/Cloud'
 import { CloudRainIcon } from '@phosphor-icons/react/dist/csr/CloudRain'
 import { rainPresets } from './rain/settings'
 import { RainAudio } from './rain/audio'
@@ -12,7 +14,7 @@ import type { RainRecording } from './rain/recordings'
 import { neutralGrade, physicalDepth, wiredPatternedGlass } from './settings'
 import type { GlassSettings } from './settings'
 import type { mountGreenhouse } from './scene'
-import type { GlassView } from './view'
+import type { GlassView, ProfileView } from './view'
 import { glassVersions } from './versions'
 import type { GlassVersion } from './versions'
 import { presentationSettings, savePresentationDefaults, settingsSnapshot } from './presentation'
@@ -20,9 +22,10 @@ import { embeddedWireDepth } from './optics'
 import { arrangements } from './earlier/arrangements'
 import { breezeMax } from './earlier/breeze'
 import { presetKey, saveDefaults } from './presets'
-import GlassGuide from './guide/GlassGuide'
 import type { Arrangement, PresetKey } from './presets'
 import './style.css'
+
+const showStudyTools = import.meta.env.DEV
 
 const rainPresetHints = {
   Deluge: 'Driving rain and heavy spray',
@@ -48,6 +51,12 @@ function Switch({ label, hint, checked, onChange }: { label: string; hint: strin
 
 export default function Glass() {
   const [timings] = useState(() => new FrameTimings())
+  const [quality, setQuality] = useState(loadQuality)
+  const qualityRef = useRef(quality)
+  const [profileView, setProfileView] = useState<ProfileView>('scene')
+  const profileViewRef = useRef(profileView)
+  const [renderSize, setRenderSize] = useState({ width: 0, height: 0 })
+  const [qualityCaps, setQualityCaps] = useState<QualityCaps>({ wireSamples: [1], reliefFilter: [1] })
   const [workbench, setWorkbench] = useState(false)
   const standalone = !workbench
   const [studyVersion, setVersion] = useState<GlassVersion>('earlier')
@@ -74,20 +83,23 @@ export default function Glass() {
     setTuning(previous => ({ ...previous, [sceneKey]: value }))
   }, [sceneKey, profile, standalone])
   const world = useRef<ReturnType<typeof mountGreenhouse> | null>(null)
+  const changeProfileView = (next: ProfileView) => {
+    profileViewRef.current = next
+    setProfileView(next)
+    timings.reset()
+    world.current?.invalidate()
+  }
+  const tuneQuality = (next: GpuQuality) => {
+    qualityRef.current = next
+    setQuality(next); storeQuality(next); timings.reset()
+    world.current?.invalidate()
+  }
   const [centerTaps, setCenterTaps] = useState(false)
   const centerTapRef = useRef(false)
   useEffect(() => {
     centerTapRef.current = centerTaps
     world.current?.invalidate()
   }, [centerTaps])
-  const [guideOpen, setGuideOpen] = useState(false)
-  const guideOpenRef = useRef(false)
-  const toggleGuide = useCallback((open: boolean) => {
-    guideOpenRef.current = open
-    world.current?.setSuspended(open)
-    setGuideOpen(open)
-    if (open) setPanel(false)
-  }, [])
   const view = useRef<GlassView | undefined>(undefined)
   const rainAudio = useRef<RainAudio | null>(null)
   const [stormBackend, setStormBackend] = useState<'starting' | 'webgpu'>('starting')
@@ -102,16 +114,19 @@ export default function Glass() {
     setSettings(live.current); world.current?.invalidate()
   }, [live, setSettings, sceneKey])
   useEffect(() => {
-    const rain = new RainAudio(); rainAudio.current = rain
+    const rain = new RainAudio(host.current); rainAudio.current = rain
     return () => { rain.dispose(); rainAudio.current = null }
   }, [])
   useEffect(() => {
     rainAudio.current?.set(ready && !error && version === 'earlier' && settings.rain ? .03 + .97 * settings.rainIntensity : 0, settings.rainVolume, settings.rainRecording)
-    if (error) rainAudio.current?.touch(0,settings.rainVolume)
   }, [version, ready, error, settings.rain, settings.rainIntensity, settings.rainVolume, settings.rainRecording])
   useEffect(() => {
     // Discard old bookmark parameters; all scene/menu choices live in React.
-    window.history.replaceState(window.history.state, '', window.location.pathname.startsWith('/glass') ? '/glass/' : '/')
+    const url = new URL(window.location.href)
+    if (url.searchParams.has('version')) {
+      url.searchParams.delete('version')
+      window.history.replaceState(window.history.state, '', url)
+    }
   }, [])
   useEffect(() => {
     timings.reset()
@@ -121,10 +136,13 @@ export default function Glass() {
     void requestWebGPUAdapter().then(async gpuAdapter => ({ gpuAdapter, module: await profile.loadScene() })).then(({ gpuAdapter, module }) => {
       if (cancelled || !host.current) return
       instance = module.mountGreenhouse(host.current, live, () => { if (!cancelled) setReadyPreset(sceneKey) }, message => { if (!cancelled) setError(message) }, {
-        standalone, timings, centerTaps: centerTapRef, gpuAdapter,
-        suspended: guideOpenRef.current,
-        onRainBackend: backend => { if (!cancelled) setStormBackend(backend) },
-        onWaterFlow: flow => rainAudio.current?.touch(flow,live.current.rainVolume),
+        standalone, quality: qualityRef, gpuAdapter,
+        ...(showStudyTools && {
+          timings, onQualityCaps: setQualityCaps, centerTaps: centerTapRef, profileView: profileViewRef,
+          onRenderSize: (width: number, height: number) => setRenderSize({ width, height }),
+          onRainBackend: (backend: 'starting' | 'webgpu') => { if (!cancelled) setStormBackend(backend) },
+        }),
+        onBrushHits: (contact, hits) => rainAudio.current?.brushHits(contact, hits),
       })
       if (view.current) instance.setView(view.current)
       world.current = instance
@@ -148,6 +166,7 @@ export default function Glass() {
     return () => media.removeEventListener('change', reduced)
   }, [change])
   useEffect(() => {
+    if (!showStudyTools) return
     const key = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && panel) { setPanel(false); panelToggle.current?.focus(); return }
       if (event.repeat || event.metaKey || event.ctrlKey || event.altKey || event.target instanceof Element && event.target.closest('input, button, select, textarea, a, summary')) return
@@ -195,20 +214,21 @@ export default function Glass() {
   return <section className={`glass-experiment ${standalone ? 'glass-standalone' : ''} ${ready && !error ? 'glass-ready' : ''}`} aria-label="Summer, through glass">
     <h1 className="sr-only">Summer, through glass</h1>
     <p className="sr-only" aria-live="polite">{profile.label} version{ready ? ' ready' : ' loading'}</p>
-    <button type="button" className="glass-guide-toggle" title="Explore the glass shader" aria-haspopup="dialog" aria-expanded={guideOpen} aria-controls="glass-guide" onClick={() => toggleGuide(true)}>About the glass <span aria-hidden="true">↗</span></button>
     <div ref={host} className={`glass-canvas ${version === 'earlier' ? 'glass-water-mode' : ''}`} role="img" tabIndex={standalone ? 0 : undefined} aria-label={`Sunlit plants behind pebbled glass. ${version === 'earlier' ? 'Left-click or touch to add water. Hold or drag to keep painting. ' : ''}Right-drag or swipe with two fingers to orbit. Scroll or pinch to zoom.${standalone ? ' Arrow keys also orbit.' : ''}`} />
     {!standalone && !ready && !error && <div className="glass-loading" role="status"><span /> <span className="sr-only">Growing the greenhouse…</span></div>}
-    {error && <div className={`glass-error ${error === webGPURequiredMessage ? 'glass-compatibility' : ''}`} role="alert"><p>{error}</p><button type="button" title="Restart the greenhouse" onClick={() => setRetry(value => value + 1)}>Reload scene</button></div>}
-    <div className="glass-tools">
-    <button ref={panelToggle} type="button" className="glass-debug-toggle" title="Show or hide settings" aria-expanded={panel} aria-controls="glass-settings" onClick={() => setPanel(value => !value)}>
-      <SlidersHorizontalIcon size={14} /><span>Debug</span>
-    </button>
-    {version === 'earlier' && <button type="button" className="glass-rain-toggle" aria-pressed={settings.rain} title="Toggle ambient rainfall" onClick={() => change('rain', !settings.rain)}>
-      <CloudRainIcon size={15} /><span>Rain {settings.rain ? 'on' : 'off'}</span>
-    </button>}
-    </div>
-    <FrameCounter timings={timings} paused={!settings.playing || guideOpen} storm={version === 'earlier' ? stormBackend : undefined} />
-    {panel && <div ref={panelRef} id="glass-settings" className="glass-settings" role="region" aria-label="Scene settings">
+    {error && <div className={`glass-error ${error === webGPURequiredMessage ? 'glass-compatibility' : ''}`} role="alert"><p>{error}</p>{showStudyTools && <button type="button" title="Restart the greenhouse" onClick={() => setRetry(value => value + 1)}>Reload scene</button>}</div>}
+    {!error && <div className="glass-tools">
+      {showStudyTools && <button ref={panelToggle} type="button" className="glass-debug-toggle" title="Show or hide settings" aria-expanded={panel} aria-controls="glass-settings" onClick={() => setPanel(value => !value)}>
+        <SlidersHorizontalIcon size={14} /><span>Debug</span>
+      </button>}
+      {version === 'earlier' && <button type="button" className="glass-rain-toggle" aria-label="Ambient rain" aria-pressed={settings.rain} title={settings.rain ? 'Turn rain off' : 'Turn rain on'} onClick={() => change('rain', !settings.rain)}>
+        {settings.rain ? <CloudRainIcon size={23} aria-hidden="true" /> : <CloudIcon size={23} aria-hidden="true" />}
+      </button>}
+    </div>}
+    {showStudyTools && <FrameCounter timings={timings} paused={!settings.playing} storm={version === 'earlier' ? stormBackend : undefined}
+      quality={quality} caps={qualityCaps} onQuality={tuneQuality} renderSize={renderSize}
+      view={profileView} onView={changeProfileView} />}
+    {showStudyTools && panel && <div ref={panelRef} id="glass-settings" className="glass-settings" role="region" aria-label="Scene settings">
       <div className="glass-panel-heading"><span>{standalone ? 'Original · debug' : `${profile.label} study`}</span><button type="button" onClick={reset} title="Restore defaults and camera">{version === 'earlier' ? 'Reset study' : 'Match reference'}</button><button type="button" aria-label="Close debug panel" title="Close (Escape)" onClick={() => setPanel(false)}><XIcon size={16} /></button></div>
       <div className="glass-save-actions"><button type="button" disabled={saving} title="Save current scene defaults" onClick={() => void saveAsDefaults()}>{saving ? 'Saving…' : standalone ? 'Save page defaults' : 'Save as defaults'}</button>{standalone && <><button type="button" title="Download settings as JSON" onClick={exportSettings}>Export JSON</button><button type="button" title="Copy settings to clipboard" onClick={() => void copySettings()}>Copy JSON</button></>}</div>
       <p className="glass-save-status" role="status">{saveStatus.key === sceneKey ? saveStatus.text : ''}</p>
@@ -273,7 +293,6 @@ export default function Glass() {
             <a href={recording.source}>{recording.title}</a> by {recording.artist} on Freesound. <a href={recording.licenseUrl}>{recording.license}</a>. {recording.edit}.
           </p>)}
         </details>
-        <Range label="Roof runoff" hint="Feed water down chains" min={0} max={2} value={settings.rainChainFlow} display={`${settings.rainChainFlow.toFixed(2)}×`} onChange={value => change('rainChainFlow', value)} />
         <p className="glass-control-note">Click or touch for a short patter. Hold or drag to paint. Right-drag or swipe with two fingers to orbit. Scroll or pinch to zoom.</p>
         {!settings.playing && <p className="glass-control-note">The scene is paused. Turn on Animate scene under Movement to let the rain fall.</p>}
       </details>}
@@ -345,6 +364,5 @@ export default function Glass() {
       </details>
       {standalone && <details className="glass-control-group"><summary title="Inspect current scene values">Settings snapshot</summary><textarea id="glass-settings-snapshot" className="glass-snapshot" title="Inspect current settings JSON" aria-label="Current Original settings JSON" readOnly value={settingsSnapshot(settings)} spellCheck={false} /></details>}
     </div>}
-    {guideOpen && <GlassGuide onClose={() => toggleGuide(false)} />}
   </section>
 }

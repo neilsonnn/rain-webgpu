@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Box3, DataTexture, Matrix4, MeshPhysicalMaterial, Vector3 } from 'three'
+import { Box3, DataTexture, Matrix4, MeshPhysicalMaterial, Raycaster, Vector3 } from 'three'
 import { createPane } from '../src/glass/earlier/pane'
 import { createWireGrid } from '../src/glass/earlier/wire'
 import { defaults } from '../src/glass/earlier/settings'
@@ -17,15 +17,16 @@ describe('finite wired pane', () => {
           grid.update({ ...defaults, wireSpacing, wireRadius })
           glass.uniforms.uGridPitch.value = wireSpacing
           const origin = glass.uniforms.uGridOrigin.value, warp = glass.uniforms.uGridWarp.value
-          for (const [axis, mesh] of grid.meshes.entries()) for (const index of [0, Math.floor(mesh.count / 2), mesh.count - 1]) {
-            mesh.getMatrixAt(index, matrix)
+          for (let index = 0; index < grid.mesh.count; index++) {
+            grid.mesh.getMatrixAt(index, matrix)
+            const vertical = Math.abs(matrix.elements[5]) > Math.abs(matrix.elements[4])
             for (const along of [-.4, 0, .4]) {
               point.set(0, along, 0).applyMatrix4(matrix)
               // Evaluate the strand's actual shader deformation, then compare
               // it with the crest phase supplied to the glass material.
-              if (axis === 0) point.x += Math.sin(point.y * 7.1) * wireRadius * .28
+              if (vertical) point.x += Math.sin(point.y * 7.1) * wireRadius * .28
               else point.y += Math.sin(point.x * 6.3) * wireRadius * .28
-              const phase = axis === 0 ? point.x - origin.x - Math.sin(point.y * 7.1) * warp
+              const phase = vertical ? point.x - origin.x - Math.sin(point.y * 7.1) * warp
                 : point.y - origin.y - Math.sin(point.x * 6.3) * warp
               expect(Math.abs(phase / wireSpacing - Math.round(phase / wireSpacing))).toBeLessThan(1e-5)
             }
@@ -38,7 +39,7 @@ describe('finite wired pane', () => {
     expect(original.uniforms.uGridWarp.value).toBe(-.00008)
     original.material.dispose(); map.dispose()
   })
-  it('has bounded front, back, and cut edges at the selected physical thickness', () => {
+  it('keeps the physical cut edges but exposes a glass face only from the front', () => {
     const material = new MeshPhysicalMaterial(), size = arrangements.canopy.pane
     const pane = createPane(material, size)
     try {
@@ -51,7 +52,10 @@ describe('finite wired pane', () => {
         expect(bounds.max.y).toBeCloseTo(size.centerY + size.height / 2, 6)
         expect(bounds.min.z).toBeCloseTo(-thickness, 6)
         expect(bounds.max.z).toBeCloseTo(0, 6)
-        expect(new Vector3(0, 0, 1).transformDirection(pane.rear!.matrixWorld).z).toBeCloseTo(-1, 8)
+        const frontRay = new Raycaster(new Vector3(.13, size.centerY, 1), new Vector3(0, 0, -1))
+        const backRay = new Raycaster(new Vector3(.13, size.centerY, -1), new Vector3(0, 0, 1))
+        expect(frontRay.intersectObject(pane.group).map(hit => hit.object)).toEqual([pane.front])
+        expect(backRay.intersectObject(pane.group)).toHaveLength(0)
       }
     } finally { pane.dispose(); material.dispose() }
   })
@@ -61,22 +65,21 @@ describe('finite wired pane', () => {
     try {
       for (const wireSpacing of [.018, .034, .07]) {
         grid.update({ ...defaults, wireSpacing })
-        for (const mesh of grid.meshes) {
-          const positions = mesh.geometry.getAttribute('position')
-          let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
-          for (let instance = 0; instance < mesh.count; instance++) {
-            mesh.getMatrixAt(instance, matrix)
-            for (let i = 0; i < positions.count; i++) {
-              vertex.fromBufferAttribute(positions, i).applyMatrix4(matrix)
-              minX = Math.min(minX, vertex.x); maxX = Math.max(maxX, vertex.x)
-              minY = Math.min(minY, vertex.y); maxY = Math.max(maxY, vertex.y)
-            }
+        const mesh = grid.mesh, positions = mesh.geometry.getAttribute('position')
+        expect(mesh.count).toBe(2 + 2 * (Math.floor((size.width / 2 - defaults.wireRadius) / wireSpacing) + Math.floor((size.height / 2 - defaults.wireRadius) / wireSpacing)))
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+        for (let instance = 0; instance < mesh.count; instance++) {
+          mesh.getMatrixAt(instance, matrix)
+          for (let i = 0; i < positions.count; i++) {
+            vertex.fromBufferAttribute(positions, i).applyMatrix4(matrix)
+            minX = Math.min(minX, vertex.x); maxX = Math.max(maxX, vertex.x)
+            minY = Math.min(minY, vertex.y); maxY = Math.max(maxY, vertex.y)
           }
-          expect(minX).toBeGreaterThanOrEqual(-size.width / 2 - 1e-6)
-          expect(maxX).toBeLessThanOrEqual(size.width / 2 + 1e-6)
-          expect(minY).toBeGreaterThanOrEqual(size.centerY - size.height / 2 - 1e-6)
-          expect(maxY).toBeLessThanOrEqual(size.centerY + size.height / 2 + 1e-6)
         }
+        expect(minX).toBeGreaterThanOrEqual(-size.width / 2 - 1e-6)
+        expect(maxX).toBeLessThanOrEqual(size.width / 2 + 1e-6)
+        expect(minY).toBeGreaterThanOrEqual(size.centerY - size.height / 2 - 1e-6)
+        expect(maxY).toBeLessThanOrEqual(size.centerY + size.height / 2 + 1e-6)
       }
     } finally { grid.dispose() }
   })

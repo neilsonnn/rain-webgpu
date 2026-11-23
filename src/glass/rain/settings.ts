@@ -30,7 +30,6 @@ export interface RainSettings {
   rainParticles: number
   rainSpray: number
   rainShake: number
-  rainChainFlow: number
   rainTurbulence: number
   rainSquallSpeed: number
   rainSquallSize: number
@@ -51,7 +50,7 @@ export const rainDefaults: RainSettings = {
   rainBrushRadius: 112, rainBrushGain: 4, rainBrushRamp: 1.5, rainBrushTail: .55,
   rainWetness: 1, rainWind: .25, rainTurbulence: 1, rainSquallSpeed: 1, rainSquallSize: 1.25, rainWander: 1,
   rainSpeed: 1, rainWindStrength: 1, rainIncidence: .55,
-  rainParticles: 1, rainSpray: 1.4, rainShake: 1, rainChainFlow: 1,
+  rainParticles: 1, rainSpray: 1.4, rainShake: 1,
   rainMainBranchStiffness: 8, rainBranchStiffness: 1.8, rainShutter: 12, rainVisibility: 1, rainVolume: .45, rainRecording: 'tin',
 }
 
@@ -65,7 +64,7 @@ export function normalizeRain<T extends RainSettings>(settings: T): T {
     rainDrying: [15, 600], rainSurfaceTension: [.3, 2],
     rainImpact: [0, 8], rainFlexibility: [.35, 2.5], rainRetention: [.2, 3], rainWetness: [0, 1.5], rainWind: [-1, 1],
     rainSpeed: [.15, 4], rainWindStrength: [0, 5], rainIncidence: [0, 1],
-    rainParticles: [.1, 8], rainSpray: [.2, 6], rainShake: [0, 4], rainChainFlow: [0, 2],
+    rainParticles: [.1, 8], rainSpray: [.2, 6], rainShake: [0, 4],
     rainTurbulence: [0, 4], rainSquallSpeed: [0, 8], rainSquallSize: [.25, 6], rainWander: [0, 2], rainMainBranchStiffness: [1, 12], rainBranchStiffness: [.5, 5], rainShutter: [2, 30], rainVisibility: [.2, 2.5], rainVolume: [0, 1] } as const
   for (const name of Object.keys(ranges) as (keyof typeof ranges)[]) {
     const [min, max] = ranges[name]

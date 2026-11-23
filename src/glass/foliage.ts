@@ -1,8 +1,9 @@
 import {
-  BufferAttribute, BufferGeometry, CatmullRomCurve3, Color, DoubleSide, DynamicDrawUsage, Group, InstancedBufferAttribute,
+  BufferAttribute, BufferGeometry, Color, DoubleSide, DynamicDrawUsage, Group, InstancedBufferAttribute,
   InstancedMesh, Matrix4, Mesh, MeshDepthMaterial, MeshStandardMaterial, Quaternion, RGBADepthPacking,
-  TubeGeometry, Vector2, Vector3, Vector4,
+  Vector2, Vector3, Vector4,
 } from 'three'
+import { foldedLeaf, stemTube } from './plant-geometry'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { leafTextures } from './textures'
 import { random } from './settings'
@@ -35,35 +36,11 @@ export interface PlantForm {
   branchNodes?: number
 }
 
-export function leafGeometry(species = 0, rows = 24, columns = 8) {
-  const positions: number[] = [], uv: number[] = [], indices: number[] = []
-  for (let row = 0; row <= rows; row++) {
-    const t = row / rows
-    const profile = Math.max(0, Math.sin(Math.PI * (species === 2 ? Math.pow(t, .72) : t)))
-    const silhouette = Math.pow(profile, species === 1 ? .92 : .7)
-      * [ .44, .28, .49, .19 ][species] * (1 - t * (species === 2 ? .12 : .28))
-    for (let column = 0; column <= columns; column++) {
-      const s = column / columns * 2 - 1
-      const serration = 1 + (species === 3 ? .045 : .019) * Math.sin(t * Math.PI * 46)
-      const x = s * silhouette * serration * (1 + s * .035 * Math.sin(t * 11))
-      const fold = .062 * (1 - Math.abs(s)) * Math.sin(Math.PI * t)
-      const cup = -(species === 2 ? .11 : .07) * s * s * Math.sin(Math.PI * t)
-      const tip = -(species === 1 ? .2 : .12) * t * t * t
-        + .023 * Math.sin(t * 9 + s * 2) * Math.sin(Math.PI * t)
-      positions.push(x, t, fold + cup + tip)
-      uv.push(column / columns, t)
-      if (row < rows && column < columns) {
-        const a = row * (columns + 1) + column, b = a + columns + 1
-        indices.push(a, a + 1, b, a + 1, b + 1, b)
-      }
-    }
-  }
-  const geometry = new BufferGeometry()
-  geometry.setAttribute('position', new BufferAttribute(new Float32Array(positions), 3))
-  geometry.setAttribute('uv', new BufferAttribute(new Float32Array(uv), 2))
-  geometry.setIndex(indices)
-  geometry.computeVertexNormals()
-  return geometry
+export function leafGeometry(species = 0) {
+  if (species === 1) return foldedLeaf(.25, .46, .20, .07)
+  if (species === 2) return foldedLeaf(.45, .36, .12, .11)
+  if (species === 3) return foldedLeaf(.17, .45, .12, .07)
+  return foldedLeaf(.39, .45, .12, .07)
 }
 
 // Irregular internodes, decussate pairs or spiral phyllotaxis, and lateral shoots
@@ -335,17 +312,7 @@ export function createFoliage(options: FoliageOptions = {}) {
     geometries.push(geometry); group.add(mesh)
   }
   const tubes = stems.map(stem => {
-    const curve = new CatmullRomCurve3(stem.points), segments = stem.points.length > 3 ? 16 : 4
-    const tube = new TubeGeometry(curve, segments, stem.radius, 4, false), position = tube.getAttribute('position')
-    for (let ring = 0; ring <= segments; ring++) {
-      const center = curve.getPointAt(ring / segments), taper = .42 + .58 * Math.pow(1 - ring / segments, .6)
-      for (let side = 0; side <= 4; side++) {
-        const index = ring * 5 + side
-        vertex.fromBufferAttribute(position, index).sub(center).multiplyScalar(taper).add(center)
-        position.setXYZ(index, vertex.x, vertex.y, vertex.z)
-      }
-    }
-    tube.computeVertexNormals()
+    const tube = stemTube(stem.points, stem.radius, .42), position = tube.getAttribute('position')
     tube.setAttribute('plantIndex', new BufferAttribute(new Float32Array(position.count).fill(stem.plant), 1))
     return tube
   })

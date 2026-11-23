@@ -228,6 +228,7 @@ export function createPaneFilm(bounds: Vector4, formBead?: (x: number,y: number,
     draw(renderer:WebGLRenderer,opticalBounds:Vector4) {
       if(!initialized)return
       uniforms.uOpticalBounds.value=opticalBounds
+      uniforms.uResolution.value=renderer.getRenderTarget()!.width
       if(contacts?.written){
         const c=contacts,n=Math.min(maxContacts,c.written),start=(c.head-n+maxContacts)%maxContacts,first=Math.min(n,maxContacts-start)
         c.attribute.addUpdateRange(start*4,first*4);c.velocity.addUpdateRange(start*2,first*2)

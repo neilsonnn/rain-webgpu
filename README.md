@@ -1,6 +1,6 @@
 # Wire Glass
 
-A standalone React and Three.js greenhouse with wired patterned glass, procedural foliage, interactive WebGPU rain, ambient recordings and an interactive glass glossary.
+A standalone React and Three.js greenhouse with wired patterned glass, procedural foliage, interactive WebGPU rain and ambient recordings.
 
 ## Run locally
 
@@ -13,9 +13,11 @@ npm run dev
 
 Open http://127.0.0.1:5173/. The previous http://127.0.0.1:5173/glass/ address also works. WebGPU is required for the rain simulation. The greenhouse is drawn with Three.js/WebGL.
 
-Left-click or touch to add water; hold or drag to continue. Right-drag or swipe with two fingers to orbit. Scroll or pinch to zoom. Debug controls open at the bottom left, and the FPS counter opens frame timings. The glass glossary pauses the scene while open.
+Left-click or touch to add water. Hold or drag to continue. Right-drag or swipe with two fingers to orbit. Scroll or pinch to zoom. The cloud in the lower left toggles ambient rain.
 
 ## Settings and scene versions
+
+Local development also shows the debug controls and frame timings.
 
 **Save page defaults** writes to `src/glass/default-presets.json` during local development. **Export JSON** makes a recovery copy. Existing browser storage keys are retained so the extraction does not discard saved settings. Earlier compositions and the Current study remain available through the archived scenes controls in development.
 
@@ -30,7 +32,7 @@ Publish `dist/` to a static host. The build includes both `/` and `/glass/` entr
 
 ## Source
 
-- `src/glass/`: scenes, shaders, procedural plants, controls and glossary.
+- `src/glass/`: scenes, shaders, procedural plants and controls.
 - `src/glass/rain/`: rain and water simulation; [implementation notes](src/glass/rain/README.md).
 - `public/audio/`: the two attributed ambient recordings.
 - `public/images/glass/`: the original visual reference.

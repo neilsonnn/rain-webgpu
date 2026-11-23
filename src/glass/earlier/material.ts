@@ -2,16 +2,10 @@ import { Matrix4, MeshPhysicalMaterial, Vector2, Vector4 } from 'three'
 import type { Texture } from 'three'
 import { defaults, optics } from './settings'
 import { rainGlassParsGLSL } from '../rain/shaders'
+import { defaultQuality, fillGlassDisks, maxGlassRays } from '../quality'
+import type { GpuQuality } from '../quality'
 
-export const GLASS_SAMPLES = 24
-
-const sampleDisks = Array.from({ length: GLASS_SAMPLES }, (_, i) => {
-  const x = (i + .5) / GLASS_SAMPLES
-  let y = 0
-  for (let bit = 0; bit < 6; bit++) y += ((i >> bit) & 1) / 2 ** (bit + 1)
-  const disk = (r: number, turn: number) => [Math.sqrt(r) * Math.cos(2 * Math.PI * turn), Math.sqrt(r) * Math.sin(2 * Math.PI * turn)]
-  return `vec4(${[...disk(x, y), ...disk((y + .381966) % 1, (x + .754877) % 1)].map(n => n.toFixed(9)).join(',')})`
-}).join(',\n')
+export const GLASS_SAMPLES = defaultQuality.rays
 
 export const glassParsGLSL = /* glsl */`
 uniform sampler2D uGardenColor;
@@ -39,7 +33,6 @@ uniform float uGridWidth;
 uniform float uGridPebbling;
 uniform float uEmbeddedMesh;
 uniform float uPaneThickness;
-uniform float uPaneSide;
 uniform float uWireDepth;
 uniform float uDepthStrength;
 uniform float uDepthScale;
@@ -47,21 +40,13 @@ uniform float uDepthCurve;
 uniform float uClearDepth;
 ${rainGlassParsGLSL}
 varying vec3 vPanePosition;
-// Canonical space always looks through an entry face at z = 0 toward a rear
-// face at -thickness. This reflection is its own inverse, so both sides retain
-// the same physical ray solver while projections stay in world coordinates.
-vec3 paneCoordinates(vec3 point) {
-  return uPaneSide > 0. ? point : vec3(point.xy, -point.z - uPaneThickness);
-}
-vec3 paneDirection(vec3 direction) { return vec3(direction.xy, direction.z * uPaneSide); }
-vec4 paneReverseField(vec4 field) { return vec4(1. - field.xy, field.z, 1. - field.a); }
 vec4 paneEntryField(vec2 point) {
   vec2 uv = point / (${optics.textureSize.toFixed(3)} * uTextureScale);
-  return uPaneSide > 0. ? texture2D(uGlassTexture, uv) : paneReverseField(texture2D(uRearTexture, uv));
+  return texture2D(uGlassTexture, uv);
 }
 vec4 paneExitField(vec2 point) {
   vec2 uv = point / (${optics.textureSize.toFixed(3)} * uTextureScale);
-  return uPaneSide > 0. ? texture2D(uRearTexture, uv) : paneReverseField(texture2D(uGlassTexture, uv));
+  return texture2D(uRearTexture, uv);
 }
 vec3 paneSurfaceNormal(vec4 field, float relief) {
   vec3 encoded = field.xyz * 2. - 1.;
@@ -87,28 +72,25 @@ vec4 panePatternedSurface(vec2 point, vec4 rolledField, float relief, float latt
     (1. - crests.y) * crestSlopes.x - (1. - crests.x) * crestSlopes.y * cos(point.x * 6.3) * uGridWarp * 6.3,
     (1. - crests.x) * crestSlopes.y - (1. - crests.y) * crestSlopes.x * cos(point.y * 7.1) * uGridWarp * 7.1
   );
-  float modulationSign = latticeRelief < 0. ? -1. : 1.;
-  float heightRatio = rolledHeight / .0008 * modulationSign;
+  float heightRatio = rolledHeight / .0008;
   float crestModulation = 1. + uGridPebbling * clamp(heightRatio, -.6, .6);
-  vec2 modulationGradient = abs(heightRatio) < .6 ? uGridPebbling * rolledGradient / .0008 * modulationSign : vec2(0.);
+  vec2 modulationGradient = abs(heightRatio) < .6 ? uGridPebbling * rolledGradient / .0008 : vec2(0.);
   float height = rolledHeight + latticeRelief * latticeHeight * crestModulation;
   vec2 gradient = rolledGradient + latticeRelief * (latticeGradient * crestModulation + latticeHeight * modulationGradient);
   return vec4(normalize(vec3(-gradient, 1.)), height);
 }
 vec4 paneFrontSurface(vec2 point, vec4 field) {
-  return panePatternedSurface(point, field, uPaneSide > 0. ? uGlassRelief : uRearRelief, uPaneSide > 0. ? uGridRelief : 0.);
+  return panePatternedSurface(point, field, uGlassRelief, uGridRelief);
 }
-vec4 paneRearSurface(vec2 point, vec4 field) {
-  float relief = uPaneSide > 0. ? uRearRelief : uGlassRelief;
-  if (uPaneSide > 0. || uGridRelief <= 0.) return vec4(paneSurfaceNormal(field, relief), paneHeight(field, relief));
-  return panePatternedSurface(point, field, relief, -uGridRelief);
+vec4 paneRearSurface(vec4 field) {
+  return vec4(paneSurfaceNormal(field, uRearRelief), paneHeight(field, uRearRelief));
 }
 vec2 paneProject(vec3 worldPosition) {
-  vec4 clipPosition = uGlassViewProjection * vec4(paneCoordinates(worldPosition), 1.);
+  vec4 clipPosition = uGlassViewProjection * vec4(worldPosition, 1.);
   return clipPosition.xy / max(.001, clipPosition.w) * .5 + .5;
 }
 vec2 paneGardenProject(vec3 worldPosition) {
-  vec4 clipPosition = uGardenViewProjection * vec4(paneCoordinates(worldPosition), 1.);
+  vec4 clipPosition = uGardenViewProjection * vec4(worldPosition, 1.);
   return clipPosition.xy / max(.001, clipPosition.w) * .5 + .5;
 }
 float paneFresnel(float cosine, float etaIncident, float etaTransmitted) {
@@ -155,26 +137,28 @@ vec3 paneAbsorption(float distanceThroughGlass) {
   // Absorption depends on travel inside the glass, never garden depth.
   return exp(-vec3(1.8, .42, .85) * distanceThroughGlass);
 }
-const vec4 paneDisks[${GLASS_SAMPLES}] = vec4[${GLASS_SAMPLES}](${sampleDisks});
+uniform int uScatterRays, uDepthSteps, uEntrySteps;
+uniform bool uInternalReflection;
+uniform vec4 uPaneDisks[${maxGlassRays}];
 `
 
 export const glassFunctionsGLSL = /* glsl */`
 vec3 paneEnvironment(vec3 direction, float surfaceRoughness) {
   #ifdef ENVMAP_TYPE_CUBE_UV
-    return textureCubeUV(envMap, envMapRotation * paneDirection(direction), surfaceRoughness).rgb * envMapIntensity;
+    return textureCubeUV(envMap, envMapRotation * direction, surfaceRoughness).rgb * envMapIntensity;
   #else
     return vec3(0.);
   #endif
 }
 vec3 paneTraceGarden(vec3 startPoint, vec3 direction, out float travel) {
-  vec3 viewStart = (uGlassView * vec4(paneCoordinates(startPoint), 1.)).xyz;
-  vec3 viewDirection = (uGlassView * vec4(paneDirection(direction), 0.)).xyz;
+  vec3 viewStart = (uGlassView * vec4(startPoint, 1.)).xyz;
+  vec3 viewDirection = (uGlassView * vec4(direction, 0.)).xyz;
   vec4 clipStart = uGardenProjection * vec4(viewStart, 1.);
   vec4 clipDirection = uGardenProjection * vec4(viewDirection, 0.);
   vec4 clip = clipStart;
   float depthRate = max(.08, -viewDirection.z);
   // Reproject against actual depth, including refracted leaf silhouettes.
-  for (int refinement = 0; refinement < 3; refinement++) {
+  for (int refinement = 0; refinement < uDepthSteps; refinement++) {
     vec2 sampleUV = clamp(clip.xy / max(.001, clip.w) * .5 + .5, vec2(.001), vec2(.999));
     float sceneDepth = -perspectiveDepthToViewZ(texture2D(uGardenDepth, sampleUV).r, uCameraClip.x, uCameraClip.y);
     travel = clamp((sceneDepth + viewStart.z) / depthRate, .0005, 14.);
@@ -185,13 +169,13 @@ vec3 paneTraceGarden(vec3 startPoint, vec3 direction, out float travel) {
 `
 
 export const glassNormalGLSL = /* glsl */`
-vec3 paneEntryPoint = paneCoordinates(vPanePosition);
-vec3 paneIncident = normalize(paneEntryPoint - paneCoordinates(cameraPosition));
+vec3 paneEntryPoint = vPanePosition;
+vec3 paneIncident = normalize(paneEntryPoint - cameraPosition);
 vec3 paneFrontPoint = paneEntryPoint;
 vec4 paneFrontField;
 vec4 paneFrontShape;
 // Intersect the height surface along the camera ray, including at oblique views.
-for (int frontRefinement = 0; frontRefinement < 3; frontRefinement++) {
+for (int frontRefinement = 0; frontRefinement < uEntrySteps; frontRefinement++) {
   paneFrontField = paneEntryField(paneFrontPoint.xy);
   paneFrontShape = paneFrontSurface(paneFrontPoint.xy, paneFrontField);
   paneFrontPoint = paneEntryPoint + paneIncident * (paneFrontShape.a / min(-.08, paneIncident.z));
@@ -212,7 +196,7 @@ float paneWaterTransmission = mix(1., 1. - paneFresnel(dot(-paneIncident, paneWa
 paneFrontPoint.xy += paneLayerIncident.xy * paneWaterHeight * paneWaterCoverage / max(.08, -paneLayerIncident.z);
 // Water reflection and glass transmission share the same geometric water field.
 vec3 paneReflectionNormal = normalize(mix(paneFrontNormal, paneWaterNormal, paneWaterCoverage));
-normal = normalize((uGlassView * vec4(paneDirection(paneReflectionNormal), 0.)).xyz);
+normal = normalize((uGlassView * vec4(paneReflectionNormal, 0.)).xyz);
 roughnessFactor = mix(roughnessFactor, .045, paneWaterCoverage);
 `
 
@@ -223,53 +207,61 @@ float paneRearAlpha = max(.0001, uGlassDiffusion * uGlassDiffusion * .82);
 vec3 paneCentralInside = refract(paneLayerIncident, paneFrontNormal, paneEntryEta / material.ior);
 vec3 paneCentralRear = paneFrontPoint + paneCentralInside * ((-uPaneThickness - paneFrontPoint.z) / min(-.08, paneCentralInside.z));
 vec4 paneCentralRearField = paneExitField(paneCentralRear.xy);
-vec3 paneCentralRearNormal = paneRearSurface(paneCentralRear.xy, paneCentralRearField).xyz;
+vec3 paneCentralRearNormal = paneSurfaceNormal(paneCentralRearField, uRearRelief);
 vec3 paneCentralExit = refract(paneCentralInside, paneCentralRearNormal, material.ior);
 if (dot(paneCentralExit, paneCentralExit) < .001 || paneCentralExit.z > -.02) paneCentralExit = paneIncident;
 float paneCentralTravel;
 vec3 paneCentralHit = paneTraceGarden(paneCentralRear, paneCentralExit, paneCentralTravel);
-vec3 paneCentralReturn = refract(reflect(paneCentralInside, paneCentralRearNormal), -paneFrontNormal, material.ior);
-if (dot(paneCentralReturn, paneCentralReturn) < .001) paneCentralReturn = -paneIncident;
 // PMREM integrates the environment lobe of the first internal reflection.
-vec3 paneInternalEnvironment = paneEnvironment(paneCentralReturn, min(1., uGlassDiffusion * 1.3));
+vec3 paneInternalEnvironment = vec3(0.);
+if (uInternalReflection) {
+  vec3 paneCentralReturn = refract(reflect(paneCentralInside, paneCentralRearNormal), -paneFrontNormal, material.ior);
+  if (dot(paneCentralReturn, paneCentralReturn) < .001) paneCentralReturn = -paneIncident;
+  paneInternalEnvironment = paneEnvironment(paneCentralReturn, min(1., uGlassDiffusion * 1.3));
+}
 vec3 paneRadiance = vec3(0.);
 mat3 paneFrontFrame = paneFrame(paneFrontNormal);
 mat3 paneFrontSampling = paneSamplingFrame(-paneLayerIncident, paneFrontFrame, paneAlpha);
 float paneFootprint = abs(uGardenProjection[1][1]) * sqrt(paneAlpha * paneAlpha + paneRearAlpha * paneRearAlpha) * (material.ior - 1.) * 2.2 * .5 * uGlassResolution.y;
 float paneMaxMip = max(0., floor(log2(max(uGlassResolution.x, uGlassResolution.y))) - 2.);
-float paneFrontViewZ = (uGlassView * vec4(paneCoordinates(paneFrontPoint), 1.)).z;
-for (int paneRay = 0; paneRay < ${GLASS_SAMPLES}; paneRay++) {
-  vec4 disks = paneDisks[paneRay];
-  vec3 frontMicroNormal = paneVisibleNormal(paneFrontFrame, paneFrontSampling, paneAlpha, disks.xy);
-  vec3 insideDirection = refract(paneLayerIncident, frontMicroNormal, paneEntryEta / material.ior);
-  float frontFresnel = paneFresnel(dot(-paneLayerIncident, frontMicroNormal), paneEntryEta, material.ior);
-  float frontWeight = paneWaterTransmission * (1. - frontFresnel) * paneMaskingWeight(paneLayerIncident, insideDirection, paneFrontNormal, paneAlpha);
-  // Sample the actual cylindrical wire at its physical position INSIDE the slab.
-  float wireTravel = max(0., (-uWireDepth - paneFrontPoint.z) / min(-.08, insideDirection.z));
-  vec3 wirePoint = paneFrontPoint + insideDirection * wireTravel;
+// The wire is embedded before the scattering exit face. Resolve its coverage
+// once along the refracted central ray, including any deflection by water.
+vec4 paneWire = vec4(0.);
+if (uEmbeddedMesh > .5) {
+  float wireTravel = max(0., (-uWireDepth - paneFrontPoint.z) / min(-.08, paneCentralInside.z));
+  vec3 wirePoint = paneFrontPoint + paneCentralInside * wireTravel;
   vec2 wireUV = clamp(paneProject(wirePoint), vec2(.001), vec2(.999));
   // Refraction can stretch one output pixel across several wire-buffer texels.
   // Filter that footprint rather than point-sampling the finest level forever.
   vec2 wireDx = dFdx(wireUV), wireDy = dFdy(wireUV);
-  vec4 wireSample = vec4(0.);
-  if (uEmbeddedMesh > .5) wireSample = textureGrad(uWireColor, wireUV, wireDx, wireDy);
-  if (uEmbeddedMesh > .5 && wireSample.a > .001) {
-    float wireViewDepth = -perspectiveDepthToViewZ(texture2D(uWireDepthMap, wireUV).r, uCameraClip.x, uCameraClip.y);
-    vec3 insideViewDirection = (uGlassView * vec4(paneDirection(insideDirection), 0.)).xyz;
-    float resolvedTravel = (wireViewDepth + paneFrontViewZ) / max(.08, -insideViewDirection.z);
+  paneWire = textureGrad(uWireColor, wireUV, wireDx, wireDy);
+  if (paneWire.a > .001) {
+    float wireViewDepth = -perspectiveDepthToViewZ(textureLod(uWireDepthMap, wireUV, 0.).r, uCameraClip.x, uCameraClip.y);
+    float frontViewZ = (uGlassView * vec4(paneFrontPoint, 1.)).z;
+    float insideViewZ = (uGlassView * vec4(paneCentralInside, 0.)).z;
+    float resolvedTravel = (wireViewDepth + frontViewZ) / max(.08, -insideViewZ);
     // The resolved depth must belong to the embedded volume, not clear pixels.
     if (resolvedTravel >= 0. && resolvedTravel < uPaneThickness * 3.) {
       wireTravel = resolvedTravel;
-      wirePoint = paneFrontPoint + insideDirection * wireTravel;
-      wireSample = textureGrad(uWireColor, clamp(paneProject(wirePoint), vec2(.001), vec2(.999)), wireDx, wireDy);
+      wirePoint = paneFrontPoint + paneCentralInside * wireTravel;
+      paneWire = textureGrad(uWireColor, clamp(paneProject(wirePoint), vec2(.001), vec2(.999)), wireDx, wireDy);
     }
   }
   // MSAA resolve premultiplies coverage into RGB; do not apply alpha twice.
-  vec3 wireRadiance = wireSample.rgb * paneAbsorption(wireTravel);
+  float wireTransmission = paneWaterTransmission * (1. - paneFresnel(dot(-paneLayerIncident, paneFrontNormal), paneEntryEta, material.ior))
+    * paneMaskingWeight(paneLayerIncident, paneCentralInside, paneFrontNormal, paneAlpha);
+  paneWire.rgb *= paneAbsorption(wireTravel) * wireTransmission;
+}
+for (int paneRay = 0; paneRay < uScatterRays; paneRay++) {
+  vec4 disks = uPaneDisks[paneRay];
+  vec3 frontMicroNormal = paneVisibleNormal(paneFrontFrame, paneFrontSampling, paneAlpha, disks.xy);
+  vec3 insideDirection = refract(paneLayerIncident, frontMicroNormal, paneEntryEta / material.ior);
+  float frontFresnel = paneFresnel(dot(-paneLayerIncident, frontMicroNormal), paneEntryEta, material.ior);
+  float frontWeight = paneWaterTransmission * (1. - frontFresnel) * paneMaskingWeight(paneLayerIncident, insideDirection, paneFrontNormal, paneAlpha);
   float insideTravel = max(.0001, (-uPaneThickness - paneFrontPoint.z) / min(-.08, insideDirection.z));
   vec3 rearPoint = paneFrontPoint + insideDirection * insideTravel;
   vec4 rearField = paneExitField(rearPoint.xy);
-  vec4 rearShape = paneRearSurface(rearPoint.xy, rearField);
+  vec4 rearShape = paneRearSurface(rearField);
   insideTravel = max(.0001, (-uPaneThickness + rearShape.a - paneFrontPoint.z) / min(-.08, insideDirection.z));
   rearPoint = paneFrontPoint + insideDirection * insideTravel;
   vec3 rearNormal = rearShape.xyz;
@@ -286,35 +278,40 @@ for (int paneRay = 0; paneRay < ${GLASS_SAMPLES}; paneRay++) {
     float depthRemap = effectiveTravel / max(.0005, physicalTravel);
     vec3 remappedHit = paneCentralHit + (physicalHit - paneCentralHit) * depthRemap;
     vec2 gardenUV = clamp(paneGardenProject(remappedHit), vec2(.001), vec2(.999));
-    float viewDepth = max(.1, -(uGlassView * vec4(paneCoordinates(physicalHit), 1.)).z);
+    float viewDepth = max(.1, -(uGlassView * vec4(physicalHit, 1.)).z);
     float footprintPixels = paneFootprint * effectiveTravel / viewDepth;
     // Each importance sample covers a finite solid angle. Mip filtering removes
     // undersampling at large footprints without imposing the previous blur cap.
-    float footprintMip = clamp(log2(max(1., footprintPixels / sqrt(${GLASS_SAMPLES.toFixed(1)}))), 0., paneMaxMip);
+    float footprintMip = clamp(log2(max(1., footprintPixels / sqrt(float(uScatterRays)))), 0., paneMaxMip);
     float rearWeight = (1. - rearFresnel) * paneMaskingWeight(insideDirection, exitDirection, rearNormal, paneRearAlpha);
     gardenRadiance = textureLod(uGardenColor, gardenUV, footprintMip).rgb * rearWeight * paneAbsorption(insideTravel);
   }
   // First internal reflection, including total internal reflection. Further
   // interreflection remains a bounded real-time approximation.
-  vec3 backReflection = reflect(insideDirection, rearMicroNormal);
-  vec3 returnToAir = refract(backReflection, -frontMicroNormal, material.ior);
-  float returnFresnel = paneFresnel(dot(backReflection, frontMicroNormal), material.ior, 1.);
   vec3 internalRadiance = vec3(0.);
-  if (dot(returnToAir, returnToAir) > .001 && returnToAir.z > 0.) {
-    internalRadiance = paneInternalEnvironment
-      * rearFresnel * (1. - returnFresnel) * paneAbsorption(insideTravel * 2.);
+  if (uInternalReflection) {
+    vec3 backReflection = reflect(insideDirection, rearMicroNormal);
+    vec3 returnToAir = refract(backReflection, -frontMicroNormal, material.ior);
+    if (dot(returnToAir, returnToAir) > .001 && returnToAir.z > 0.) {
+      float returnFresnel = paneFresnel(dot(backReflection, frontMicroNormal), material.ior, 1.);
+      internalRadiance = paneInternalEnvironment
+        * rearFresnel * (1. - returnFresnel) * paneAbsorption(insideTravel * 2.);
+    }
   }
-  paneRadiance += frontWeight * (wireRadiance + (1. - wireSample.a) * (gardenRadiance + internalRadiance));
+  paneRadiance += frontWeight * (gardenRadiance + internalRadiance);
 }
 // Front GGX reflection is already in totalSpecular. Transmission never adds
 // diffuse glass paint or an opacity overlay to the surface.
-totalDiffuse = paneRadiance / ${GLASS_SAMPLES.toFixed(1)};
+totalDiffuse = paneWire.rgb + (1. - paneWire.a) * paneRadiance / float(uScatterRays);
 `
 
 export function createGlassMaterial(color: Texture, depth: Texture, front: Texture, rear: Texture, wire: Texture, wireDepth: Texture,
   grid?: { origin: Vector2; warp: { value: number } }) {
   const material = new MeshPhysicalMaterial({ color: '#ffffff', metalness: 0, roughness: defaults.surfaceRoughness, ior: optics.ior, envMapIntensity: .7 })
   const uniforms = {
+    uScatterRays: { value: GLASS_SAMPLES }, uDepthSteps: { value: defaultQuality.depthSteps }, uEntrySteps: { value: defaultQuality.entrySteps },
+    uInternalReflection: { value: Boolean(defaultQuality.bounces) },
+    uPaneDisks: { value: fillGlassDisks(new Float32Array(maxGlassRays * 4), GLASS_SAMPLES) },
     uGardenColor: { value: color }, uGardenDepth: { value: depth }, uWireColor: { value: wire }, uWireDepthMap: { value: wireDepth },
     uGlassTexture: { value: front }, uRearTexture: { value: rear },
     uRainWater: { value: front }, uRainBounds: { value: new Vector4(-2.4, -.6, 4.8, 4.8) },
@@ -325,7 +322,6 @@ export function createGlassMaterial(color: Texture, depth: Texture, front: Textu
     uGlassRelief: { value: defaults.relief }, uRearRelief: { value: defaults.rearRelief },
     uTextureScale: { value: defaults.textureScale },
     uGlassDiffusion: { value: defaults.diffusion }, uPaneThickness: { value: optics.thickness as number },
-    uPaneSide: { value: 1 },
     uFrontRoughness: { value: defaults.surfaceRoughness }, uGridPitch: { value: defaults.wireSpacing },
     uGridOrigin: { value: grid?.origin ?? new Vector2() }, uGridWarp: grid?.warp ?? { value: -.00008 },
     uGridRelief: { value: defaults.gridRelief }, uGridWidth: { value: defaults.gridWidth },
@@ -343,6 +339,11 @@ export function createGlassMaterial(color: Texture, depth: Texture, front: Textu
       .replace('#include <lights_physical_fragment>', `#include <lights_physical_fragment>\nmaterial.specularColor = mix(material.specularColor, vec3(.02037), paneWaterCoverage);`)
       .replace('#include <transmission_fragment>', glassTransmissionGLSL)
   }
-  material.customProgramCacheKey = () => 'continuous-patterned-glass-v8-fluid'
-  return { material, uniforms }
+  material.customProgramCacheKey = () => 'front-pane-central-wire-v9'
+  return { material, uniforms, setQuality(q: GpuQuality) {
+    if (uniforms.uScatterRays.value !== q.rays) fillGlassDisks(uniforms.uPaneDisks.value, q.rays)
+    uniforms.uScatterRays.value = q.rays
+    uniforms.uInternalReflection.value = Boolean(q.bounces)
+    uniforms.uDepthSteps.value = q.depthSteps; uniforms.uEntrySteps.value = q.entrySteps
+  } }
 }

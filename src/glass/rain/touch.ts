@@ -3,27 +3,26 @@ import type { PerspectiveCamera } from 'three'
 import type { GlassSettings } from '../settings'
 
 const between = (low: number, high: number) => low + Math.random() * (high - low)
-function emptyPress() {
-  return { down: false, virtual: false, moved: false, anchored: false,
+function emptyPress(slot: number) {
+  return { slot, down: false, virtual: false, moved: false, anchored: false,
     screenX: 0, screenY: 0, force: 0, x: 0, y: 0, radius: 0,
-    start: 0, last: 0, carry: 0, pending: 0, next: 0, tailAt: 0, tailEnd: 0, flow: 0 }
+    start: 0, last: 0, carry: 0, pending: 0, next: 0, tailAt: 0, tailEnd: 0 }
 }
 type Press = ReturnType<typeof emptyPress>
 type Contact = { touch: boolean; x: number; y: number; force: number; due: number; patter?: Press }
 type Pair = { a: Contact; b: Contact; x: number; y: number; span: number; orbiting: boolean }
 
 export function attachWaterTouch(host: HTMLElement, camera: PerspectiveCamera, settings: () => GlassSettings,
-  water: { readonly ready: boolean; stroke(ax: number, ay: number, bx: number, by: number, radius: number, pressure: number, dt: number, hits: number, push: boolean): void },
-  invalidate: () => void, begin: () => void, orbit: (dx: number, dy: number, distanceRatio: number) => void,
-  onFlow?: (flow: number) => void) {
+  water: { readonly ready: boolean; stroke(ax: number, ay: number, bx: number, by: number, radius: number, pressure: number, dt: number, hits: number, push: boolean, contact: number): void },
+  invalidate: () => void, begin: () => void, orbit: (dx: number, dy: number, distanceRatio: number) => void) {
   const ray = new Raycaster(), ndc = new Vector2(), plane = new Plane(new Vector3(0, 0, 1), 0), point = new Vector3()
-  const pool = Array.from({ length: 24 }, emptyPress), fingers = new Map<number, Contact>()
+  const pool = Array.from({ length: 24 }, (_, slot) => emptyPress(slot)), fingers = new Map<number, Contact>()
   let pair: Pair | undefined
   let steady: Press | undefined, wandering: Press | undefined, liftAt = 0, nextTap = 0, wake = 0
   const consume = (event: PointerEvent) => { event.preventDefault(); event.stopImmediatePropagation() }
 
   function deposit(p: Press, hits: number, spread = 1) {
-    water.stroke(p.x, p.y, p.x, p.y, p.radius * spread, p.force, 0, hits, false)
+    water.stroke(p.x, p.y, p.x, p.y, p.radius * spread, p.force, 0, hits, false, p.virtual ? -1 : p.slot)
   }
 
   function sample(p: Press, now: number, first = false) {
@@ -41,12 +40,11 @@ export function attachWaterTouch(host: HTMLElement, camera: PerspectiveCamera, s
     p.radius = pixel * s.rainBrushRadius
     const age = Math.min(1, Math.max(0, (now - p.start) / (1000 * s.rainBrushRamp)))
     const gain = 1 + (s.rainBrushGain - 1) * age * age * (3 - 2 * age)
-    p.flow = Math.min(1,(150+80*p.force)*gain/(230*Math.max(1,s.rainBrushGain)))
     if (p.moved && p.anchored) {
       const demand = p.carry + Math.hypot(point.x - p.x, point.y - p.y) * 44 * Math.sqrt(gain) / Math.max(.003, p.radius)
       const hits = Math.floor(demand)
       p.carry = demand - hits
-      water.stroke(p.x, p.y, point.x, point.y, p.radius, p.force, dt, hits, !p.virtual)
+      water.stroke(p.x, p.y, point.x, point.y, p.radius, p.force, dt, hits, !p.virtual, p.virtual ? -1 : p.slot)
     }
     p.x = point.x; p.y = point.y; p.anchored = true; p.moved = false
     if (first) {
@@ -178,7 +176,6 @@ export function attachWaterTouch(host: HTMLElement, camera: PerspectiveCamera, s
     window.clearTimeout(wake); wake = 0; endDebug(); pair = undefined
     for (const [id, c] of fingers) { stopPainting(c, false); release(id) }
     for (const p of pool) p.pending = 0
-    onFlow?.(0)
   }
   const context = (event: Event) => event.preventDefault()
   // Browsers deliver horizontal trackpad swipes as wheel events. Keep the
@@ -221,13 +218,6 @@ export function attachWaterTouch(host: HTMLElement, camera: PerspectiveCamera, s
         }
         if (p.pending >= 1) next = Math.min(next, p.next)
       }
-      let flow = 0
-      if (s.glass) for (const p of pool) {
-        if (p.virtual || !p.anchored) continue
-        const fade = p.down ? 1 : p.pending >= 1 ? Math.max(0, Math.min(1,(p.tailEnd-now)/Math.max(1,s.rainBrushTail*1000))) : 0
-        flow = Math.max(flow,p.flow*fade)
-      }
-      onFlow?.(flow)
       if (!s.playing && Number.isFinite(next)) wake = window.setTimeout(invalidate, Math.max(1, next - now))
     },
     suspend,

@@ -62,7 +62,7 @@ fn spawnRain(id: u32, old: Particle) -> Particle {
   let sample=random(&seed);
   var size=diameter(random(&seed)); var v=velocity(pos,size,sample);
   // Reserve some of the airborne population for the last stretch above leaves.
-  let leafCount=u32(params.p[24].y);
+  let leafCount=u32(params.p[4].x);
   if (id%89u==0u && leafCount>0u && random(&seed)<smoothstep(.55,1.0,params.p[0].z)) {
     var leaf=leaves[min(u32(random(&seed)*f32(leafCount)),leafCount-1u)];
     let other=leaves[min(u32(random(&seed)*f32(leafCount)),leafCount-1u)];
@@ -199,8 +199,7 @@ fn advance(@builtin(global_invocation_id) gid: vec3<u32>) {
       let contact=mix(old,p.p.xyz,(old.z-.003)/(old.z-p.p.z));
       retainWater(contact.xy,p.p.w,1.0); p.v.w=0.0;
     }
-    // Runoff shed by a roof chain or leaf is an arriving drop, not a splash
-    // fragment. It can strike another leaf and initiate another local burst.
+    // A drip shed by a leaf can strike another leaf and start a local burst.
     if (p.a.w>.5 && p.a.y>.05 && p.p.z<0.0) {
       let hit=leafHit(old,p.p.xyz,p.p.w*.5);
       if (hit.x>=0.0) {

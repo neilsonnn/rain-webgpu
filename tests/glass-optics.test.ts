@@ -37,23 +37,25 @@ describe('glass construction and optical invariants', () => {
     const far = diffusionDistance(2, s.depthStrength, s.depthScale, s.depthCurve, s.clearDepth)
     expect(far / near).toBeGreaterThan(25)
   })
-  it('keeps both cylindrical wire families inside the textured slab at every construction limit', () => {
+  it('instances one opaque quad per strand and embeds both families within the slab', () => {
     const grid = createWireGrid(1), matrix = new Matrix4(), vertex = new Vector3()
     for (const thickness of [.006, .012]) for (const wireRadius of [.0002, .0009]) for (const wireDepth of [.15, .85]) {
       const s = { ...defaults, thickness, wireRadius, wireDepth, relief: 1.5, rearRelief: 1.5 }
       grid.update(s)
       const depth = embeddedWireDepth(thickness, wireRadius, wireDepth, s.relief, s.rearRelief)
       expect(depth).toBeGreaterThan(wireRadius)
-      for (const mesh of grid.meshes) {
-        const positions = mesh.geometry.getAttribute('position')
-        mesh.getMatrixAt(0, matrix)
+      const mesh = grid.mesh, positions = mesh.geometry.getAttribute('position')
+      expect(positions.count).toBe(4)
+      expect(mesh.geometry.index?.count).toBe(6)
+      expect(mesh.material.transparent).toBe(false)
+      expect(mesh.material.depthWrite).toBe(true)
+      for (const instance of [0, mesh.count - 1]) {
+        mesh.getMatrixAt(instance, matrix)
         for (let i = 0; i < positions.count; i++) {
           vertex.fromBufferAttribute(positions, i).applyMatrix4(matrix)
-          expect(vertex.z).toBeLessThanOrEqual(-.0008 * s.relief + 1e-8)
-          expect(vertex.z).toBeGreaterThanOrEqual(-thickness + .0008 * s.rearRelief - 1e-8)
+          expect(vertex.z + wireRadius).toBeLessThanOrEqual(-.0008 * s.relief + 1e-8)
+          expect(vertex.z - wireRadius).toBeGreaterThanOrEqual(-thickness + .0008 * s.rearRelief - 1e-8)
         }
-        const normal = mesh.geometry.getAttribute('normal')
-        expect(new Set(Array.from(normal.array).map(v => v.toFixed(2))).size).toBeGreaterThan(6)
       }
     }
     grid.dispose()

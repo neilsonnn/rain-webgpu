@@ -50,9 +50,9 @@ export function createRainCurtain(bounds: Vector4, resolution: { value: Vector2 
   }
   const front = volume(1), back = volume(-1)
   return { front, back,
-    update(dt: number, time: number, s: GlassSettings, strength: number) {
-      const count = Math.round(9000 * Math.max(0, s.rainParticles - 1) * strength ** 1.8)
-      front.geometry.instanceCount = back.geometry.instanceCount = Math.min(count, maxPerSide)
+    update(dt: number, time: number, s: GlassSettings, strength: number, airFraction = 1) {
+      const count = Math.round(airFraction * Math.min(maxPerSide, 9000 * Math.max(0, s.rainParticles - 1) * strength ** 1.8))
+      front.geometry.instanceCount = back.geometry.instanceCount = count
       front.visible = back.visible = count > 0
       if (!count) return
       rainVelocity(uniforms.uVelocity.value, at, time, s, strength, .003, squalls.phase)
