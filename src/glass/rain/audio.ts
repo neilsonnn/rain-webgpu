@@ -10,6 +10,8 @@ interface Loop {
 // Web Audio time constants, in seconds. After three time constants a fade is 95% complete.
 const brushAttack = .03, brushRelease = .06
 const ambientAttack = .9, ambientRelease = 1.5
+// The glass recording averages about 6 dB below the tin roof recording.
+const glassGain = 2
 
 export class RainAudio {
   private context?: AudioContext
@@ -53,7 +55,7 @@ export class RainAudio {
   }
 
   private syncBrush() {
-    const target = this.brushPressed && this.canPlay() ? this.volume : 0
+    const target = this.brushPressed && this.canPlay() ? this.volume * glassGain : 0
     if (target) this.player(this.activate(), 'glass')
     if (target === this.brushTarget || !this.context) return
     // Each change starts at the current gain, with no queued fade to undo.
