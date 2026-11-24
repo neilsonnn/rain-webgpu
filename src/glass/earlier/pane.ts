@@ -2,6 +2,7 @@ import { BoxGeometry, Group, Mesh, MeshPhysicalMaterial, PlaneGeometry } from 't
 import type { GlassSettings } from './settings'
 
 export interface PaneSize { width: number; height: number; centerY: number }
+export const standalonePaneSize: PaneSize = { width: 3.6, height: 3.6, centerY: 1.8 }
 
 export function createPane(material: MeshPhysicalMaterial, size?: PaneSize) {
   const group = new Group(), geometry = new PlaneGeometry(size?.width ?? 32, size?.height ?? 32)

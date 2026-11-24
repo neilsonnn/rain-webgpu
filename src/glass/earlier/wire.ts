@@ -112,10 +112,11 @@ export function createWireGrid(width = 8, height = width, centerY = 1.8, finish:
     if (key === construction) return
     construction = key
     const depth = embeddedWireDepth(s.thickness, s.wireRadius, s.wireDepth, s.relief, s.rearRelief)
+    const edgeClearance = s.wireRadius * (finish === 'iron' ? 1.345 : 1.28)
     let strandCount = 0
     for (let axis = 0; axis < 2; axis++) {
       const span = axis === 0 ? width : height
-      const halfCount = Math.floor((span / 2 - s.wireRadius) / s.wireSpacing)
+      const halfCount = Math.floor((span / 2 - edgeClearance) / s.wireSpacing)
       rotation.setFromAxisAngle(zAxis, axis === 0 ? 0 : -Math.PI / 2)
       scale.set(s.wireRadius, axis === 0 ? height : width, s.wireRadius)
       // The nearer family is first, so depth testing rejects covered crossings.

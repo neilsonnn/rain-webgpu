@@ -12,7 +12,7 @@ import type { Arrangement } from '../presets'
 
 const sunDirection = new Vector3(-.6, .8, -.2).normalize()
 
-export function createEnvironment(renderer: WebGLRenderer) {
+export function createEnvironment(renderer: WebGLRenderer, skySaturation = 1) {
   const scene = new Scene(), sky = new Sky()
   sky.scale.setScalar(100)
   sky.material.uniforms.turbidity.value = 3.8
@@ -20,6 +20,14 @@ export function createEnvironment(renderer: WebGLRenderer) {
   sky.material.uniforms.mieCoefficient.value = .004
   sky.material.uniforms.mieDirectionalG.value = .78
   sky.material.uniforms.sunPosition.value.copy(sunDirection).multiplyScalar(100)
+  if (skySaturation !== 1) {
+    // Retain the sky's luminance and soften its color before baking reflections.
+    sky.material.fragmentShader = sky.material.fragmentShader.replace('#include <tonemapping_fragment>', `
+      float skyLuminance = dot(gl_FragColor.rgb, vec3(.2126, .7152, .0722));
+      gl_FragColor.rgb = mix(vec3(skyLuminance), gl_FragColor.rgb, ${skySaturation.toFixed(3)});
+      #include <tonemapping_fragment>
+    `)
+  }
   scene.add(sky)
   const beamGeometry = new BoxGeometry(.075, .1, 12)
   const beamMaterial = new MeshBasicMaterial({ color: '#17241c' })

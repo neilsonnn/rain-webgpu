@@ -1,6 +1,6 @@
 import { EventDispatcher, PerspectiveCamera, Spherical, Vector2, Vector3 } from 'three'
 
-export const orbitLimits = { yaw: .48, pitch: .26, softZone: .45, minDistance: 1.05, maxDistance: 4.8 } as const
+export const orbitLimits = { yaw: .48, pitch: .26, softZone: .45, minDistance: 1.05, maxDistance: 1.8 } as const
 export const touchPinchGain = 2
 const trackpadPinchGain = 12
 

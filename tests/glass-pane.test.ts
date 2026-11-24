@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Box3, DataTexture, Matrix4, MeshPhysicalMaterial, Raycaster, Vector3 } from 'three'
-import { createPane } from '../src/glass/earlier/pane'
+import { createPane, standalonePaneSize } from '../src/glass/earlier/pane'
 import { createWireGrid } from '../src/glass/earlier/wire'
 import { defaults } from '../src/glass/earlier/settings'
 import { arrangements } from '../src/glass/earlier/arrangements'
@@ -39,8 +39,13 @@ describe('finite wired pane', () => {
     expect(original.uniforms.uGridWarp.value).toBe(-.00008)
     original.material.dispose(); map.dispose()
   })
-  it('keeps the physical cut edges but exposes a glass face only from the front', () => {
-    const material = new MeshPhysicalMaterial(), size = arrangements.canopy.pane
+  const paneSizes = [
+    { label: 'standalone', size: standalonePaneSize },
+    { label: 'canopy', size: arrangements.canopy.pane },
+  ]
+
+  it.each(paneSizes)('keeps the physical cut edges and front-facing glass on the $label pane', ({ size }) => {
+    const material = new MeshPhysicalMaterial()
     const pane = createPane(material, size)
     try {
       for (const thickness of [.006, .012]) {
@@ -59,14 +64,15 @@ describe('finite wired pane', () => {
       }
     } finally { pane.dispose(); material.dispose() }
   })
-  it('ends both wire families at the rectangular sheet instead of continuing into space', () => {
-    const size = arrangements.canopy.pane, grid = createWireGrid(size.width, size.height, size.centerY)
+  it.each(paneSizes)('ends both wire families at the edges of the $label pane', ({ size }) => {
+    const grid = createWireGrid(size.width, size.height, size.centerY)
     const matrix = new Matrix4(), vertex = new Vector3()
     try {
       for (const wireSpacing of [.018, .034, .07]) {
         grid.update({ ...defaults, wireSpacing })
         const mesh = grid.mesh, positions = mesh.geometry.getAttribute('position')
-        expect(mesh.count).toBe(2 + 2 * (Math.floor((size.width / 2 - defaults.wireRadius) / wireSpacing) + Math.floor((size.height / 2 - defaults.wireRadius) / wireSpacing)))
+        const edgeClearance = defaults.wireRadius * 1.28
+        expect(mesh.count).toBe(2 + 2 * (Math.floor((size.width / 2 - edgeClearance) / wireSpacing) + Math.floor((size.height / 2 - edgeClearance) / wireSpacing)))
         let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
         for (let instance = 0; instance < mesh.count; instance++) {
           mesh.getMatrixAt(instance, matrix)

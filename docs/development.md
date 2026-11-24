@@ -21,6 +21,12 @@ Local development also shows the debug controls and frame timings.
 
 **Save page defaults** writes to `src/glass/default-presets.json` during local development. **Export JSON** makes a recovery copy. Existing browser storage keys are retained so the extraction does not discard saved settings. Earlier compositions and the Current study remain available through the archived scenes controls in development.
 
+## TODO
+
+- [x] Clip the embedded wire to the glass pane so it cannot extend past the edges.
+- [x] Reduce the pane's extent so the glass does not stretch too far into the distance at oblique viewing angles.
+- [x] Lower the maximum camera distance to limit how far the user can zoom out.
+
 ## Build
 
 ```sh

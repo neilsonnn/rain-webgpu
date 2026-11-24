@@ -1,5 +1,6 @@
 import { Plane, Raycaster, Vector2, Vector3 } from 'three'
 import type { PerspectiveCamera } from 'three'
+import type { PaneSize } from '../earlier/pane'
 import type { GlassSettings } from '../settings'
 
 const between = (low: number, high: number) => low + Math.random() * (high - low)
@@ -15,7 +16,7 @@ type Pair = { a: Contact; b: Contact; x: number; y: number; span: number; orbiti
 export function attachWaterTouch(host: HTMLElement, camera: PerspectiveCamera, settings: () => GlassSettings,
   water: { readonly ready: boolean; stroke(ax: number, ay: number, bx: number, by: number, radius: number, pressure: number, dt: number, hits: number, push: boolean): void },
   invalidate: () => void, begin: () => void, orbit: (dx: number, dy: number, distanceRatio: number) => void,
-  onBrushPressed?: (pressed: boolean) => void) {
+  onBrushPressed?: (pressed: boolean) => void, pane?: PaneSize) {
   const ray = new Raycaster(), ndc = new Vector2(), plane = new Plane(new Vector3(0, 0, 1), 0), point = new Vector3()
   const pool = Array.from({ length: 24 }, emptyPress), fingers = new Map<number, Contact>()
   let pair: Pair | undefined
@@ -37,6 +38,9 @@ export function attachWaterTouch(host: HTMLElement, camera: PerspectiveCamera, s
     }
     ray.setFromCamera(ndc.set(x, y), camera)
     if (!ray.ray.intersectPlane(plane, point)) { p.anchored = false; return false }
+    if (pane && (Math.abs(point.x) > pane.width / 2 || Math.abs(point.y - pane.centerY) > pane.height / 2)) {
+      p.anchored = false; return false
+    }
     const pixel = 2 * camera.position.distanceTo(point) * Math.tan(camera.fov * Math.PI / 360) / rect.height
     p.radius = pixel * s.rainBrushRadius
     const age = Math.min(1, Math.max(0, (now - p.start) / (1000 * s.rainBrushRamp)))

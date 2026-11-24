@@ -85,7 +85,7 @@ describe('standalone greenhouse orbit', () => {
       surface.dispatchEvent(Object.assign(new Event('wheel', { cancelable: true }), { deltaY: 10000, deltaMode: 0 }))
       orbit.update()
     }
-    expect(pose().radius).toBeCloseTo(orbitLimits.maxDistance, 12)
+    expect(pose().radius).toBeCloseTo(1.8, 12)
     orbit.reset()
     expect(pose().theta).toBe(0); expect(pose().phi).toBeCloseTo(Math.PI / 2, 12); expect(pose().radius).toBeCloseTo(initial, 12)
     orbit.dispose()

@@ -18,7 +18,7 @@ import { dielectricFresnel, embeddedWireDepth } from './optics'
 import type { GlassView, GlassSceneOptions } from '../view'
 import { arrangements } from './arrangements'
 import type { SceneArrangement } from './arrangements'
-import { createPane } from './pane'
+import { createPane, standalonePaneSize } from './pane'
 import { SoftOrbitControls, touchPinchGain } from '../orbit'
 import { createStorm } from '../rain/storm'
 import { attachWaterTouch } from '../rain/touch'
@@ -30,6 +30,7 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
   settings.current = normalizeGlassSettings(settings.current, options.standalone ? defaults : undefined)
   if (!options.standalone) saveGlassSettings(settings.current)
   const arrangement = settings.current.arrangement, composition: SceneArrangement = arrangements[arrangement]
+  const paneSize = options.standalone ? standalonePaneSize : composition.pane
   const renderer = new WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' })
   if (!renderer.extensions.has('EXT_color_buffer_float') && !renderer.extensions.has('EXT_color_buffer_half_float')) {
     renderer.dispose(); renderer.forceContextLoss()
@@ -51,8 +52,8 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
   const orbitCamera = camera.clone()
   orbitCamera.position.set(0, 1.8, 2.25)
   if (options.standalone) {
-    // Look up and left across the pane from a closer, lower-right orbit.
-    const radius = 1.55, yaw = .42, pitch = Math.PI / 2 + .19
+    // Look up and right across the pane from a closer, lower-left orbit.
+    const radius = 1.55, yaw = -.36, pitch = Math.PI / 2 + .19
     orbitCamera.position.set(
       radius * Math.sin(pitch) * Math.sin(yaw),
       1.8 + radius * Math.cos(pitch),
@@ -91,15 +92,15 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
   })
   const composite = new WebGLRenderTarget(1, 1, { type: HalfFloatType, depthBuffer: true })
   const relief = rolledGlassTexture(), rearRelief = rolledGlassTexture(768, 7391)
-  const wire = composition.pane ? createWireGrid(composition.pane.width, composition.pane.height, composition.pane.centerY) : createWireGrid()
-  const glass = createGlassMaterial(target.texture, gardenDepth, relief, rearRelief, wireTarget.texture, wireDepth, composition.pane ? wire.surfaceGrid : undefined)
-  const grading = createGrading(composite.texture), pane = createPane(glass.material, composition.pane)
+  const wire = paneSize ? createWireGrid(paneSize.width, paneSize.height, paneSize.centerY) : createWireGrid()
+  const glass = createGlassMaterial(target.texture, gardenDepth, relief, rearRelief, wireTarget.texture, wireDepth, paneSize ? wire.surfaceGrid : undefined)
+  const grading = createGrading(composite.texture), pane = createPane(glass.material, paneSize)
   pane.update(settings.current); surface.add(pane.group)
   const foliage = createFoliage(arrangement), architecture = createArchitecture(arrangement)
   const springFoliage = composition.motion === 'split' ? createSpringFoliage({
     garden: growGarden(arrangement, 'left'), textures: leafTextures, geometry: leafGeometry, earlierLook: true, windScale: composition.windScale,
   }) : undefined
-  const rain = createStorm(renderer, foliage.rain, () => settings.current, composition.pane, () => {
+  const rain = createStorm(renderer, foliage.rain, () => settings.current, paneSize, () => {
     if (rain.backend !== 'starting') options.onRainBackend?.(rain.backend)
     invalidate()
   }, options.timings, { adapter: options.gpuAdapter, terrain: {texture:relief,grid:wire.surfaceGrid}, onFailure: message => { waterTouch.suspend(); failure(message) } })
@@ -115,6 +116,7 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
   surface.add(surfaceLights.group)
   const drySun = lights.sun.intensity, drySurfaceSun = surfaceLights.sun.intensity
   let environment: WebGLRenderTarget | undefined
+  let paneEnvironment: WebGLRenderTarget | undefined
   let stopped = false, disposed = false, ready = false, frame = 0, time = 12, previous = 0
   let lastWidth = 0, lastHeight = 0
   let savedSettings = settings.current
@@ -285,10 +287,10 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
         } finally {
           camera.layers.set(0)
           garden.background = background
-          renderer.setClearColor(composition.background, 1)
+          renderer.setClearColor(options.standalone ? '#000000' : composition.background, 1)
         }
         renderer.setRenderTarget(composite)
-        if (composition.pane) {
+        if (!options.standalone && composition.pane) {
           // The unfiltered garden remains visible outside the cut pane. Its
           // depth also occludes glass when orbiting behind the foliage.
           wire.mesh.visible = false
@@ -361,7 +363,7 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
       controls.update()
     }
     invalidate()
-  }, options.onBrushPressed)
+  }, options.onBrushPressed, paneSize)
   const dispose = () => {
     if (disposed) return
     renderTimer.dispose(); glassTimer.dispose()
@@ -376,13 +378,15 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
     renderer.domElement.removeEventListener('webglcontextlost', lost)
     rain.dispose(); foliage.dispose(); springFoliage?.dispose(); architecture.dispose(); lights.dispose(); surfaceLights.dispose(); wire.dispose(); grading.dispose()
     delete host.dataset.rainBackend
-    environment?.dispose(); target.dispose(); wireTarget.dispose(); composite.dispose()
+    environment?.dispose(); paneEnvironment?.dispose(); target.dispose(); wireTarget.dispose(); composite.dispose()
     relief.dispose(); rearRelief.dispose(); pane.dispose(); glass.material.dispose(); meshMaterial.dispose()
     renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove()
   }
   try {
     environment = createEnvironment(renderer)
-    garden.environment = surface.environment = environment.texture
+    if (options.standalone) paneEnvironment = createEnvironment(renderer, .35)
+    garden.environment = environment.texture
+    surface.environment = (paneEnvironment ?? environment).texture
     garden.environmentIntensity = composition.environment; surface.environmentIntensity = 1
     resize()
     observer.observe(host)
