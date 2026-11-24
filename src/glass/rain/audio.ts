@@ -34,8 +34,11 @@ export class RainAudio {
     window.addEventListener('pointerup', this.gesture, true)
     window.addEventListener('keydown', this.gesture, true)
     document.addEventListener('visibilitychange', this.visibility)
-    // Decode ahead of the first hit, without opening a live output device.
-    if (typeof OfflineAudioContext !== 'undefined') {
+  }
+
+  // Called once the scene has drawn, without opening a live output device.
+  preloadBrush() {
+    if (!this.disposed && typeof OfflineAudioContext !== 'undefined') {
       void this.prepareGlass().catch(() => { /* Retry on the first audible hit. */ })
     }
   }

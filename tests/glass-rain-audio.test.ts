@@ -49,11 +49,13 @@ describe('rain audio lifecycle', () => {
     expect(fetch).toHaveBeenCalledTimes(1)
     expect(context.source.start).toHaveBeenCalledOnce()
   })
-  it('prepares the glass sample before interaction without starting live output', async () => {
+  it('waits for preloading before downloading the glass sample and leaves live output off', async () => {
     audio.dispose()
     const decode = vi.fn(async () => ({ duration: 93 }))
     vi.stubGlobal('OfflineAudioContext', class { decodeAudioData = decode })
     audio = new RainAudio()
+    expect(fetch).not.toHaveBeenCalled()
+    audio.preloadBrush()
     await vi.waitFor(() => expect(decode).toHaveBeenCalledOnce())
     expect(contexts).toHaveLength(0)
     audio.set(0, .5)

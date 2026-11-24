@@ -208,19 +208,21 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
     if (disposed || stopped || document.hidden) { previous = 0; return }
     if (renderer.getPixelRatio() !== pixelRatio()) resize()
     const s = settings.current, elapsed = previous ? (now - previous) / 1000 : 0
+    const playing = s.playing && !options.openingFrame?.current
+    const delta = playing ? Math.min(elapsed, .05) : 0
     const quality = options.quality?.current ?? defaultQuality
     if (quality !== appliedQuality) applyQuality(quality)
     if (s !== savedSettings) { if (!options.standalone) saveGlassSettings(s); savedSettings = s }
     previous = now
     controls.update(elapsed || 1 / 60)
-    if (s.playing) time += Math.min(elapsed, .05)
+    time += delta
     const detailed = options.timings?.expanded
     let simStart = detailed ? performance.now() : 0
     waterTouch.update(now, options.centerTaps?.current ?? false)
-    rain.update(s.playing ? Math.min(elapsed, .05) : 0, s, time, quality)
+    rain.update(delta, s, time, quality)
     let simulationMs = detailed ? performance.now() - simStart : 0
     host.dataset.rainBackend = rain.backend
-    if (s.playing) smoothPointer.lerp(pointer, 1 - Math.exp(-Math.min(elapsed || .016, .05) * 1.5))
+    if (playing) smoothPointer.lerp(pointer, 1 - Math.exp(-Math.min(elapsed || .016, .05) * 1.5))
     const drift = s.drift
     camera.position.copy(orbitCamera.position)
     camera.position.x += (Math.sin(time * .083) * .035 + smoothPointer.x * .016) * drift
@@ -254,7 +256,7 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
     foliage.uniforms.uPlantTime.value = time
     foliage.uniforms.uBreeze.value = s.breeze
     if (detailed && springFoliage) simStart = performance.now()
-    springFoliage?.update(s.playing ? Math.min(elapsed, .05) : 0, s.breeze)
+    springFoliage?.update(delta, s.breeze)
     if (detailed && springFoliage) simulationMs += performance.now() - simStart
     glass.uniforms.uGlassRelief.value = s.relief
     glass.uniforms.uTextureScale.value = s.textureScale
@@ -346,7 +348,7 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
     } finally { renderTimer.end() }
     options.timings?.record(elapsed, simulationMs, detailed ? performance.now() - renderStart : 0)
     if (!stopped && !ready && rain.surface.ready) { ready = true; onReady() }
-    if (s.playing && !stopped) invalidate()
+    if (playing && !stopped) invalidate()
     else previous = 0
   }
   const invalidate = () => {
