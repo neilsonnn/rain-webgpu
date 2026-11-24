@@ -9,6 +9,7 @@ export interface GlassView {
 
 export interface GlassSceneOptions {
   standalone?: boolean
+  openingFrame?: { readonly current: boolean }
   centerTaps?: { readonly current: boolean }
   timings?: FrameTimings
   quality?: { readonly current: GpuQuality }

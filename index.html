@@ -7,14 +7,73 @@
   <meta name="description" content="A greenhouse through wired patterned glass. Procedural foliage, interactive rain and water, built with Three.js and WebGPU." />
   <meta name="author" content="Neilson Koerner-Safrata" />
   <link rel="license" href="/audio/credits.txt" type="text/plain" title="Ambient recording credits" />
-  <style>html,body,#root{margin:0;background:#000;color-scheme:dark}</style>
+  <link rel="preload" as="image" type="image/avif" media="(orientation: landscape)" fetchpriority="high"
+        imagesrcset="/images/glass/opening-wide-small.avif 1680w, /images/glass/opening-wide.avif 3360w"
+        imagesizes="max(100vw, 311.111vh)" />
+  <link rel="preload" as="image" type="image/avif" media="(orientation: portrait)" fetchpriority="high"
+        imagesrcset="/images/glass/opening-portrait-small.avif 540w, /images/glass/opening-portrait.avif 1080w"
+        imagesizes="max(100vw, 42.1875vh)" />
+  <style>
+    :root { --glass-edge-shade: linear-gradient(180deg, #101b1218, transparent 22%, transparent 78%, #08120c42); }
+    html, body, #root { margin: 0; background: #000; color-scheme: dark; }
+    #glass-opening {
+      position: fixed; inset: 0; z-index: 20; overflow: hidden; background: #000;
+      transition: opacity 250ms ease 100ms;
+    }
+    #glass-opening[data-phase="ready"] { opacity: 0; }
+    #glass-opening::after {
+      content: ''; position: absolute; inset: 0; pointer-events: none; background: var(--glass-edge-shade);
+    }
+    /* The lens preserves the shorter dimension. Crop the render on the longer axis. */
+    #glass-opening img {
+      position: absolute; top: 50%; left: 50%; display: block; max-width: none;
+      width: auto; height: 100%; min-width: 100%; object-fit: cover; transform: translate(-50%, -50%);
+    }
+    @media (orientation: portrait) {
+      #glass-opening img { width: 100%; height: auto; min-width: 0; min-height: 100%; }
+    }
+    .glass-opening-bar {
+      position: absolute; inset: auto 0 0; z-index: 1; height: 2px;
+      background: #e7e9db26; transition: opacity 150ms ease 100ms;
+    }
+    .glass-opening-bar::before {
+      content: ''; position: absolute; inset: 0; background: #e7e9dbb3;
+      transform: scaleX(.04); transform-origin: left;
+      transition: transform 7s cubic-bezier(.1,.6,.2,1);
+    }
+    #glass-opening[data-phase="loading"] .glass-opening-bar::before { transform: scaleX(.88); }
+    #glass-opening[data-phase="ready"] .glass-opening-bar { opacity: 0; }
+    #glass-opening[data-phase="ready"] .glass-opening-bar::before { transform: scaleX(1); transition-duration: 100ms; }
+    @media (prefers-reduced-motion: reduce) {
+      #glass-opening, .glass-opening-bar, .glass-opening-bar::before { transition: none; }
+    }
+  </style>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@200;300;400;600;700;800&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@200;300;400;600;700;800&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
   <title>rain-webgpu</title>
 </head>
 <body>
   <main id="root"></main>
+  <div id="glass-opening">
+    <picture>
+      <source media="(orientation: portrait)" type="image/avif" width="1080" height="2560"
+              srcset="/images/glass/opening-portrait-small.avif 540w, /images/glass/opening-portrait.avif 1080w"
+              sizes="max(100vw, 42.1875vh)" />
+      <source media="(orientation: landscape)" type="image/avif" width="3360" height="1080"
+              srcset="/images/glass/opening-wide-small.avif 1680w, /images/glass/opening-wide.avif 3360w"
+              sizes="max(100vw, 311.111vh)" />
+      <source media="(orientation: portrait)" srcset="/images/glass/opening-portrait-small.webp" width="540" height="1280" />
+      <img src="/images/glass/opening-wide-small.webp" width="1680" height="540" alt="" fetchpriority="high" decoding="sync" />
+    </picture>
+    <div class="glass-opening-bar" role="progressbar" aria-label="Loading rain-webgpu"></div>
+  </div>
+  <script>
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const opening = document.getElementById('glass-opening')
+      if (!opening.dataset.phase) opening.dataset.phase = 'loading'
+    }))
+  </script>
   <script type="module" src="/src/main.tsx"></script>
 </body>
 </html>

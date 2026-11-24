@@ -31,8 +31,7 @@ function programs(earlier = false, earlierLook = false, breeze = false) {
     { name: 'leaf shadow', material: foliage.depth, source: ShaderLib.depth, defines: '#define USE_INSTANCING\n#define DEPTH_PACKING 3201\n' },
     { name: 'stem', material: foliage.stem, source: ShaderLib.standard, defines: '#define USE_SHADOWMAP\n' },
     { name: 'stem shadow', material: foliage.stemDepth, source: ShaderLib.depth, defines: '#define DEPTH_PACKING 3201\n' },
-    { name: 'wire ribbon', material: wire.material, source: ShaderLib.standard, defines: '#define USE_INSTANCING\n#define USE_SHADOWMAP\n' },
-    { name: 'wire shadow', material: wire.depth, source: ShaderLib.depth, defines: '#define USE_INSTANCING\n#define DEPTH_PACKING 3201\n' },
+    { name: 'wire ribbon', material: wire.material, source: ShaderLib.standard, defines: '#define USE_INSTANCING\n' },
   ]
   const counts = '#define NUM_DIR_LIGHTS 2\n#define NUM_POINT_LIGHTS 0\n#define NUM_SPOT_LIGHTS 0\n#define NUM_RECT_AREA_LIGHTS 0\n#define NUM_HEMI_LIGHTS 1\n#define NUM_DIR_LIGHT_SHADOWS 1\n#define NUM_POINT_LIGHT_SHADOWS 0\n#define NUM_SPOT_LIGHT_SHADOWS 0\n#define NUM_SPOT_LIGHT_MAPS 0\n#define NUM_SPOT_LIGHT_COORDS 0\n#define NUM_SPOT_LIGHT_SHADOWS_WITH_MAPS 0\n#define SHADOWMAP_TYPE_PCF_SOFT\n'
   const result = variants.map(({ name, material, source, defines }) => {

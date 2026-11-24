@@ -1,6 +1,8 @@
 import { EventDispatcher, PerspectiveCamera, Spherical, Vector2, Vector3 } from 'three'
 
 export const orbitLimits = { yaw: .48, pitch: .26, softZone: .45, minDistance: 1.05, maxDistance: 4.8 } as const
+export const touchPinchGain = 2
+const trackpadPinchGain = 12
 
 // The final part of each outward drag consumes the remaining angle
 // exponentially. Reverse input responds immediately, without hidden overscroll.
@@ -22,6 +24,7 @@ export class SoftOrbitControls extends EventDispatcher<OrbitEvents> {
   enableDamping = true
   private readonly pending = new Vector2()
   private pendingZoom = 0
+  private pendingPinch = 0
   private readonly sphere = new Spherical()
   private readonly offset = new Vector3()
   private mouseId: number | null = null
@@ -54,8 +57,12 @@ export class SoftOrbitControls extends EventDispatcher<OrbitEvents> {
   }
   drag(dx: number, dy: number, distanceRatio = 1) {
     const scale = Math.PI * 2 * .35 / Math.max(1, this.element.clientHeight)
-    this.pendingZoom += Math.log(distanceRatio)
+    if (distanceRatio !== 1) this.pinch(Math.log(distanceRatio) * touchPinchGain)
     this.turn(-dx * scale, -dy * scale)
+  }
+  private pinch(zoom: number) {
+    this.pendingZoom = 0
+    this.pendingPinch += zoom
   }
   private down = (event: PointerEvent) => {
     if (event.pointerType !== 'mouse' || event.button !== 2 || this.mouseId !== null) return
@@ -85,7 +92,10 @@ export class SoftOrbitControls extends EventDispatcher<OrbitEvents> {
   private wheel = (event: WheelEvent) => {
     event.preventDefault()
     const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? this.element.clientHeight : 1
-    this.pendingZoom += event.deltaY * unit * -Math.log(.95) * .006
+    const zoom = event.deltaY * unit * -Math.log(.95) * .006
+    // Trackpad pinches arrive as small, Ctrl-modified pixel wheel events.
+    if (event.ctrlKey && event.deltaMode === 0) this.pinch(zoom * trackpadPinchGain)
+    else this.pendingZoom += zoom
     this.dispatchEvent({ type: 'change' })
   }
   private key = (event: KeyboardEvent) => {
@@ -100,7 +110,8 @@ export class SoftOrbitControls extends EventDispatcher<OrbitEvents> {
     const weight = this.enableDamping ? -Math.expm1(-Math.max(0, Math.min(deltaTime, .1)) * 9) : 1
     this.sphere.theta = softenOrbit(this.sphere.theta, this.pending.x * weight, -orbitLimits.yaw, orbitLimits.yaw, orbitLimits.yaw * orbitLimits.softZone)
     this.sphere.phi = softenOrbit(this.sphere.phi, this.pending.y * weight, Math.PI / 2 - orbitLimits.pitch, Math.PI / 2 + orbitLimits.pitch, orbitLimits.pitch * orbitLimits.softZone)
-    const zoom = Math.max(-1, Math.min(1, this.pendingZoom * weight))
+    const zoom = this.pendingPinch + Math.max(-1, Math.min(1, this.pendingZoom * weight))
+    this.pendingPinch = 0
     this.sphere.radius = Math.max(orbitLimits.minDistance, Math.min(orbitLimits.maxDistance, this.sphere.radius * Math.exp(zoom)))
     this.pending.multiplyScalar(1 - weight); this.pendingZoom *= 1 - weight
     if (this.pending.lengthSq() < 1e-12) this.pending.set(0, 0)
@@ -113,7 +124,7 @@ export class SoftOrbitControls extends EventDispatcher<OrbitEvents> {
   }
   saveState() { this.savedPosition.copy(this.camera.position); this.savedTarget.copy(this.target) }
   reset() {
-    this.pending.set(0, 0); this.pendingZoom = 0
+    this.pending.set(0, 0); this.pendingZoom = 0; this.pendingPinch = 0
     this.camera.position.copy(this.savedPosition); this.target.copy(this.savedTarget)
     this.update(); this.dispatchEvent({ type: 'change' })
   }

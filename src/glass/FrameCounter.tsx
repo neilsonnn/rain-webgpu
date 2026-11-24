@@ -11,9 +11,7 @@ const controls: { key: QualityKey; label: string; hint: string; format?: (v: num
   { key: 'entrySteps', label: 'Glass relief steps', hint: 'Refinements where the viewing ray first meets the bumpy glass.' },
   { key: 'bounces', label: 'Internal reflection', hint: 'Include the light that bounces inside the slab. Front-surface reflections stay on.', format: v => v ? '1 bounce' : 'Off' },
   { key: 'reliefFilter', label: 'Glass texture filtering', hint: 'Anisotropic filtering of the rolled-glass maps, most visible at oblique angles.', format: v => v + '×' },
-  { key: 'wireSamples', label: 'Wire antialiasing', hint: 'Coverage samples on thin wires. Higher settings reduce shimmer.', format: v => v + '×' },
-  { key: 'shadowTaps', label: 'Shadow filter', hint: 'Depth samples per shadow lookup on lit surfaces.', format: v => v === 1 ? 'Hard · 1' : v === 16 ? 'Soft · 16' : 'Wide · 17' },
-  { key: 'shadowSize', label: 'Shadow maps', hint: 'Sun and fill shadow-map widths. Larger maps preserve finer wire and leaf shadows.', format: v => (v / 2) + ' / ' + v + ' px' },
+  { key: 'wireSamples', label: 'Wire antialiasing', hint: 'Coverage samples on thin wires. Higher settings reduce shimmer.', format: v => v === 1 ? 'No multisampling' : v + '×' },
   { key: 'waterSize', label: 'Water surface map', hint: 'Bead and streak shading detail on wet glass. The stored water stays in place.', format: v => v + '²' },
   { key: 'airPercent', label: 'Airborne rain', hint: 'Share of falling drops to simulate and draw. Fewer drops also means fewer airborne hits on leaves and glass.', format: v => v + '%' },
 ]
@@ -51,7 +49,7 @@ export function FrameCounter({ timings, paused, storm, quality, caps, onQuality,
           <input type="checkbox" checked={view !== 'scene'} onChange={event => onView(event.target.checked ? 'garden' : 'scene')} />
           Disable glass pane
         </label>
-        {view !== 'scene' && <label title="Draw garden geometry with a simple unlit material. Skip shadows, rain and grading.">
+        {view !== 'scene' && <label title="Draw garden geometry with a simple unlit material. Skip rain and grading.">
           <input type="checkbox" checked={view === 'meshes'} onChange={event => onView(event.target.checked ? 'meshes' : 'garden')} />
           Mesh only
         </label>}

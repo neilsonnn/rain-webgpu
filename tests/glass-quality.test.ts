@@ -20,7 +20,17 @@ it('keeps valid local settings while falling back for unsafe counts', () => {
   expect(loadQuality()).toEqual({ ...defaultQuality, rays: 12 })
 })
 
-it('offers wire coverage levels supported by both color and depth', () => {
-  expect(supportedWireSamples(new Int32Array([8,4,2]), new Int32Array([4,2]))).toEqual([1,2,4])
-  expect(supportedWireSamples(null, new Int32Array([4]))).toEqual([1])
+it('starts existing browsers at 12 rays and the maximum water map while keeping other preferences', () => {
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => key.endsWith(':v1') ? '{"rays":24,"waterSize":768,"pixelRatio":0.75,"shadowSize":4096,"wireSamples":4}' : null,
+  })
+  expect(loadQuality()).toEqual({ ...defaultQuality, rays: 12, waterSize: 2048, wireSamples: 2, pixelRatio: .75 })
+})
+
+it('offers only wire samples supported by both the color and depth buffers', () => {
+  const getInternalformatParameter = vi.fn()
+    .mockReturnValueOnce(new Int32Array([8, 4, 2]))
+    .mockReturnValueOnce(new Int32Array([2]))
+  const gl = { RENDERBUFFER: 36161, RGBA16F: 34842, DEPTH_COMPONENT24: 33190, SAMPLES: 32937, getInternalformatParameter }
+  expect(supportedWireSamples(gl as unknown as WebGL2RenderingContext)).toEqual([1, 2])
 })

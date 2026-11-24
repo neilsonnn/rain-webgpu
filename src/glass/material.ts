@@ -2,7 +2,7 @@ import { Matrix4, MeshPhysicalMaterial, Vector2 } from 'three'
 import type { Texture } from 'three'
 import { defaults, optics } from './settings'
 
-export const GLASS_SAMPLES = 24
+export const GLASS_SAMPLES = 12
 
 export const glassParsGLSL = /* glsl */`
 uniform sampler2D uGardenColor;

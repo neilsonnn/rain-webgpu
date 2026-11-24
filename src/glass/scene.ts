@@ -1,7 +1,7 @@
 import { createRenderTimer } from './performance'
 import {
   ACESFilmicToneMapping, Color, DepthTexture, HalfFloatType, LinearMipmapLinearFilter,
-  Mesh, MOUSE, PCFSoftShadowMap, PerspectiveCamera, PlaneGeometry, Scene, SRGBColorSpace,
+  Mesh, MOUSE, PerspectiveCamera, PlaneGeometry, Scene, SRGBColorSpace,
   TOUCH, UnsignedIntType, Vector2, Vector3, WebGLRenderer, WebGLRenderTarget,
 } from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
@@ -15,6 +15,7 @@ import { createWireGrid } from './wire'
 import { createGrading } from './grading'
 import { dielectricFresnel, embeddedWireDepth } from './optics'
 import type { GlassView, GlassSceneOptions } from './view'
+import { defaultQuality, supportedLevel, supportedWireSamples } from './quality'
 
 export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSettings }, onReady: () => void, onFailure: (message: string) => void, options: GlassSceneOptions = {}) {
   // Capture the current controls before any hot refresh or renderer rebuild.
@@ -29,8 +30,6 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
   renderer.setClearColor('#000000')
   renderer.outputColorSpace = SRGBColorSpace
   renderer.toneMapping = ACESFilmicToneMapping
-  renderer.shadowMap.enabled = true
-  renderer.shadowMap.type = PCFSoftShadowMap
   renderer.domElement.setAttribute('aria-hidden', 'true')
   host.appendChild(renderer.domElement)
 
@@ -60,7 +59,8 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
     depthTexture: gardenDepth,
   })
   const wireDepth = new DepthTexture(1, 1, UnsignedIntType)
-  const wireTarget = new WebGLRenderTarget(1, 1, { type: HalfFloatType, samples: Math.min(4, renderer.capabilities.maxSamples), depthTexture: wireDepth })
+  const wireCount = supportedLevel(defaultQuality.wireSamples, supportedWireSamples(renderer.getContext() as WebGL2RenderingContext))
+  const wireTarget = new WebGLRenderTarget(1, 1, { type: HalfFloatType, samples: wireCount === 1 ? 0 : wireCount, depthTexture: wireDepth })
   const composite = new WebGLRenderTarget(1, 1, { type: HalfFloatType, depthBuffer: false })
   const relief = rolledGlassTexture(), rearRelief = rolledGlassTexture(768, 7391)
   const glass = createGlassMaterial(target.texture, gardenDepth, relief, rearRelief, wireTarget.texture, wireDepth)
@@ -69,7 +69,6 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
   surface.add(new Mesh(paneGeometry, glass.material))
   const foliage = createFoliage(), architecture = createArchitecture()
   const lights = greenhouseLights(), surfaceLights = greenhouseLights()
-  surfaceLights.sun.castShadow = surfaceLights.fill.castShadow = false
   lights.group.traverse(object => object.layers.enable(1))
   garden.add(foliage.group, architecture.group, lights.group, wire.mesh)
   surface.add(surfaceLights.group)
@@ -91,10 +90,10 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
     renderer.setPixelRatio(Math.min(ratio, budget))
     renderer.setSize(lastWidth, lastHeight, false)
     renderer.getDrawingBufferSize(drawingSize)
-    wire.materials.uniforms.uWireResolution.value.copy(drawingSize)
     target.setSize(drawingSize.x, drawingSize.y)
     wireTarget.setSize(drawingSize.x, drawingSize.y); composite.setSize(drawingSize.x, drawingSize.y)
     glass.uniforms.uGlassResolution.value.copy(drawingSize)
+    wire.materials.uniforms.uWireResolution.value.copy(drawingSize)
     grading.uniforms.uGradeResolution.value.copy(drawingSize)
     camera.aspect = lastWidth / lastHeight
     // Preserve the composition's width on narrow screens without stretching it.
@@ -161,8 +160,7 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
     const renderStart = detailed ? performance.now() : 0
     try {
       if (s.glass) {
-        // Keep full geometric wire shadows while excluding its surface from the
-        // garden color/depth. Its optical depth must not share the foliage blur.
+        // Render the wire separately from the garden so its optical depth stays sharp.
         renderer.setRenderTarget(target)
         renderer.render(garden, gardenCamera)
         const background = garden.background
@@ -171,7 +169,6 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
             camera.layers.set(1)
             garden.background = null
             renderer.setClearColor(0x000000, 0)
-            renderer.shadowMap.autoUpdate = false
             renderer.setRenderTarget(wireTarget)
             renderer.render(garden, camera)
           }
@@ -179,7 +176,6 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
           camera.layers.set(0)
           garden.background = background
           renderer.setClearColor('#050907', 1)
-          renderer.shadowMap.autoUpdate = true
         }
         renderer.setRenderTarget(composite)
         renderer.render(surface, camera)
