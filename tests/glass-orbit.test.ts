@@ -74,10 +74,13 @@ describe('standalone greenhouse orbit', () => {
   })
   it('retains wheel/pinch zoom, clamps distance, and restores the original pose', () => {
     const { orbit, surface, pose } = setup()
-    orbit.enableDamping = false; orbit.saveState()
+    orbit.saveState()
     const initial = pose().radius
-    orbit.drag(0, 0, .5); orbit.update()
-    expect(pose().radius).toBeCloseTo(initial / 2, 10)
+    orbit.drag(0, 0, .8); orbit.update()
+    expect(pose().radius).toBeCloseTo(initial * .8 ** 2, 10)
+    orbit.update()
+    expect(pose().radius).toBeCloseTo(initial * .8 ** 2, 10)
+    orbit.enableDamping = false
     for (let i = 0; i < 8; i++) {
       surface.dispatchEvent(Object.assign(new Event('wheel', { cancelable: true }), { deltaY: 10000, deltaMode: 0 }))
       orbit.update()
@@ -85,6 +88,21 @@ describe('standalone greenhouse orbit', () => {
     expect(pose().radius).toBeCloseTo(orbitLimits.maxDistance, 12)
     orbit.reset()
     expect(pose().theta).toBe(0); expect(pose().phi).toBeCloseTo(Math.PI / 2, 12); expect(pose().radius).toBeCloseTo(initial, 12)
+    orbit.dispose()
+  })
+  it('amplifies trackpad pinches on the first frame while keeping regular wheel zoom damped', () => {
+    const { orbit, surface, pose } = setup()
+    const initial = pose().radius
+    const wheel = (ctrlKey: boolean) => surface.dispatchEvent(Object.assign(
+      new Event('wheel', { cancelable: true }), { deltaY: -60, deltaMode: 0, ctrlKey },
+    ))
+    wheel(false); orbit.update()
+    expect(pose().radius).toBeCloseTo(initial * .95 ** (60 * .006 * -Math.expm1(-9 / 60)), 10)
+    orbit.reset()
+    wheel(true); orbit.update()
+    expect(pose().radius).toBeCloseTo(initial * .95 ** (60 * .006 * 12), 10)
+    orbit.update()
+    expect(pose().radius).toBeCloseTo(initial * .95 ** (60 * .006 * 12), 10)
     orbit.dispose()
   })
 })

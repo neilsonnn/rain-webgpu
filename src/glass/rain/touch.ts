@@ -116,7 +116,7 @@ export function attachWaterTouch(host: HTMLElement, camera: PerspectiveCamera, s
     const span = Math.hypot(g.a.x - g.b.x, g.a.y - g.b.y)
     const dx = x - g.x, dy = y - g.y
     if (!g.orbiting) {
-      if (Math.hypot(dx, dy) < 7 && Math.abs(span - g.span) < 10) return
+      if (Math.hypot(dx, dy) < 7 && Math.abs(span - g.span) < 4) return
       g.orbiting = true; stopPainting(g.a, false); stopPainting(g.b, false)
       syncBrushPressed()
     }

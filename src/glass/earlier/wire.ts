@@ -1,6 +1,6 @@
 import {
-  FrontSide, InstancedBufferAttribute, InstancedMesh, Matrix4, MeshDepthMaterial, MeshStandardMaterial,
-  NoBlending, PlaneGeometry, Quaternion, RGBADepthPacking, Vector2, Vector3,
+  InstancedBufferAttribute, InstancedMesh, Matrix4, MeshStandardMaterial,
+  NoBlending, PlaneGeometry, Quaternion, Vector2, Vector3,
 } from 'three'
 import type { GlassSettings } from './settings'
 import { conductorF0, dielectricFresnel, embeddedWireDepth, zinc } from './optics'
@@ -11,9 +11,6 @@ type Finish = 'zinc' | 'iron'
 export function wireMaterials(finish: Finish = 'zinc') {
   const galvanized = finish === 'zinc'
   const material = new MeshStandardMaterial({ metalness: 1, roughness: .34, blending: NoBlending })
-  // The ribbon faces the light during a shadow draw, just as it faces the eye during a color draw.
-  material.shadowSide = FrontSide
-  const depth = new MeshDepthMaterial({ depthPacking: RGBADepthPacking })
   const uniforms = {
     uWireRadius: { value: .00038 }, uWireResolution: { value: new Vector2(1, 1) }, uWireRoughness: { value: .34 },
     uWirePatina: { value: .3 }, uWireLightTransmission: { value: .957 },
@@ -26,76 +23,67 @@ export function wireMaterials(finish: Finish = 'zinc') {
       return vWireProfile.x - uWireRadius * vWireProfile.y * warp;
     }
   `
-  for (const [m, beauty] of [[material, true], [depth, false]] as const) {
-    const lighting = beauty ? 'varying vec3 vWireSide, vWireFront, vWireWorld;' : ''
-    m.onBeforeCompile = shader => {
-      Object.assign(shader.uniforms, uniforms)
-      shader.vertexShader = `uniform float uWireRadius;
-        uniform vec2 uWireResolution;
-        attribute float wirePhase;
-        varying vec4 vWireProfile;
-        ${lighting}
-      ` + shader.vertexShader.replace('#include <project_vertex>', /* glsl */`
-        mat4 wireMatrix = modelMatrix * instanceMatrix;
-        vec4 wireCenter = wireMatrix * vec4(0., position.y, 0., 1.);
-        vec4 centerView = viewMatrix * wireCenter;
-        vec3 along = normalize(mat3(viewMatrix) * wireMatrix[1].xyz);
-        vec3 eye = isPerspectiveMatrix(projectionMatrix) ? -centerView.xyz : vec3(0., 0., 1.);
-        vec3 side = cross(along, eye);
-        side *= inversesqrt(max(dot(side, side), 1e-12));
-        bool vertical = abs(instanceMatrix[1].y) > abs(instanceMatrix[1].x);
-        vec3 warpAxis = vertical ? vec3(1., 0., 0.) : vec3(0., 1., 0.);
-        float travel = vertical ? wireCenter.y : wireCenter.x;
-        float halfWidth = uWireRadius * ${galvanized ? '1.28' : '1.345'};
-        ${beauty ? `// Half a filter footprint beyond the physical edge also covers subpixel strands.
-        halfWidth += 1.5 * abs(centerView.z) / (projectionMatrix[1][1] * uWireResolution.y);
-        vWireSide = side; vWireFront = cross(side, along); vWireWorld = wireCenter.xyz;` : ''}
-        vWireProfile = vec4(position.x * halfWidth, dot(side, mat3(viewMatrix * modelMatrix) * warpAxis),
-          travel * (vertical ? 7.1 : 6.3) + wirePhase, travel * (vertical ? 24.7 : 22.1) + wirePhase * 2.3);
-        vec4 mvPosition = centerView + vec4(side * vWireProfile.x, 0.);
-        gl_Position = projectionMatrix * mvPosition;
-      `)
-      shader.fragmentShader = [shape, lighting, shader.fragmentShader].join('\n')
-      if (!beauty) {
-        shader.fragmentShader = shader.fragmentShader.replace('#include <clipping_planes_fragment>',
-          '#include <clipping_planes_fragment>\nif (abs(wireOffset()) > uWireRadius) discard;')
-        return
+  material.onBeforeCompile = shader => {
+    Object.assign(shader.uniforms, uniforms)
+    shader.vertexShader = `uniform float uWireRadius;
+      uniform vec2 uWireResolution;
+      attribute float wirePhase;
+      varying vec4 vWireProfile;
+      varying vec3 vWireSide, vWireFront, vWireWorld;
+    ` + shader.vertexShader.replace('#include <project_vertex>', /* glsl */`
+      mat4 wireMatrix = modelMatrix * instanceMatrix;
+      vec4 wireCenter = wireMatrix * vec4(0., position.y, 0., 1.);
+      vec4 centerView = viewMatrix * wireCenter;
+      vec3 along = normalize(mat3(viewMatrix) * wireMatrix[1].xyz);
+      vec3 eye = isPerspectiveMatrix(projectionMatrix) ? -centerView.xyz : vec3(0., 0., 1.);
+      vec3 side = cross(along, eye);
+      side *= inversesqrt(max(dot(side, side), 1e-12));
+      bool vertical = abs(instanceMatrix[1].y) > abs(instanceMatrix[1].x);
+      vec3 warpAxis = vertical ? vec3(1., 0., 0.) : vec3(0., 1., 0.);
+      float travel = vertical ? wireCenter.y : wireCenter.x;
+      float halfWidth = uWireRadius * ${galvanized ? '1.28' : '1.345'};
+      // Give narrow strands enough raster coverage to shade their subpixel edge.
+      halfWidth += 1.5 * abs(centerView.z) / (projectionMatrix[1][1] * uWireResolution.y);
+      vWireSide = side; vWireFront = cross(side, along); vWireWorld = wireCenter.xyz;
+      vWireProfile = vec4(position.x * halfWidth, dot(side, mat3(viewMatrix * modelMatrix) * warpAxis),
+        travel * (vertical ? 7.1 : 6.3) + wirePhase, travel * (vertical ? 24.7 : 22.1) + wirePhase * 2.3);
+      vec4 mvPosition = centerView + vec4(side * vWireProfile.x, 0.);
+      gl_Position = projectionMatrix * mvPosition;
+    `)
+    shader.fragmentShader = shape + /* glsl */`
+      varying vec3 vWireSide, vWireFront, vWireWorld;
+      uniform float uWireRoughness, uWirePatina, uWireLightTransmission;
+      float wireFilteredSine(float phase) {
+        vec2 footprint = vec2(dFdx(phase), dFdy(phase));
+        return sin(phase) * exp(-.125 * dot(footprint, footprint));
       }
-      shader.fragmentShader = /* glsl */`
-        uniform float uWireRoughness, uWirePatina, uWireLightTransmission;
-        float wireFilteredSine(float phase) {
-          vec2 footprint = vec2(dFdx(phase), dFdy(phase));
-          return sin(phase) * exp(-.125 * dot(footprint, footprint));
-        }
-      ` + shader.fragmentShader
-        .replace('#include <roughnessmap_fragment>', /* glsl */`
-          #include <roughnessmap_fragment>
-          float offset = wireOffset();
-          float pixelWidth = max(fwidth(offset), 1e-8);
-          float left = max(-uWireRadius, offset - .5 * pixelWidth);
-          float right = min(uWireRadius, offset + .5 * pixelWidth);
-          float coverage = clamp((right - left) / pixelWidth, 0., 1.);
-          if (coverage <= 0.) discard;
-          float wireOxide = .5 + .5 * wireFilteredSine(vWireWorld.x * 2100. + wireFilteredSine(vWireWorld.y * 1440.));
-          float pitting = .5 + .5 * wireFilteredSine(vWireWorld.y * 9200. + vWireWorld.x * 7600.);
-          roughnessFactor = clamp(uWireRoughness + uWirePatina * wireOxide * ${galvanized ? '.25 + pitting * .04' : '.23 + pitting * .025'}, .08, .95);
-          diffuseColor.rgb = mix(diffuseColor.rgb, ${galvanized ? 'vec3(.17, .19, .16), uWirePatina * wireOxide * .45' : 'vec3(.095, .065, .041), uWirePatina * wireOxide * .65'});
-        `)
-        .replace('#include <metalnessmap_fragment>', `#include <metalnessmap_fragment>\nmetalnessFactor *= 1. - uWirePatina * wireOxide * ${galvanized ? '.35' : '.8'};`)
-        .replace('#include <normal_fragment_begin>', /* glsl */`
-          #include <normal_fragment_begin>
-          float radial = clamp((left + right) * .5 / uWireRadius, -1., 1.);
-          normal = normalize(radial * vWireSide + sqrt(max(0., 1. - radial * radial)) * vWireFront);
-          nonPerturbedNormal = normal;
-        `)
-        .replace('#include <opaque_fragment>', /* glsl */`
-          // Store area coverage for glass filtering. Blending stays off and metal writes depth.
-          gl_FragColor = vec4(outgoingLight * uWireLightTransmission * coverage, coverage);
-        `)
-    }
-    m.customProgramCacheKey = () => `wire-ribbon-${finish}-${beauty}`
+    ` + shader.fragmentShader
+      .replace('#include <roughnessmap_fragment>', /* glsl */`
+        #include <roughnessmap_fragment>
+        float offset = wireOffset();
+        float pixelWidth = max(fwidth(offset), 1e-8);
+        float left = max(-uWireRadius, offset - .5 * pixelWidth);
+        float right = min(uWireRadius, offset + .5 * pixelWidth);
+        float coverage = clamp((right - left) / pixelWidth, 0., 1.);
+        if (coverage <= 0.) discard;
+        float wireOxide = .5 + .5 * wireFilteredSine(vWireWorld.x * 2100. + wireFilteredSine(vWireWorld.y * 1440.));
+        float pitting = .5 + .5 * wireFilteredSine(vWireWorld.y * 9200. + vWireWorld.x * 7600.);
+        roughnessFactor = clamp(uWireRoughness + uWirePatina * wireOxide * ${galvanized ? '.25 + pitting * .04' : '.23 + pitting * .025'}, .08, .95);
+        diffuseColor.rgb = mix(diffuseColor.rgb, ${galvanized ? 'vec3(.17, .19, .16), uWirePatina * wireOxide * .45' : 'vec3(.095, .065, .041), uWirePatina * wireOxide * .65'});
+      `)
+      .replace('#include <metalnessmap_fragment>', `#include <metalnessmap_fragment>\nmetalnessFactor *= 1. - uWirePatina * wireOxide * ${galvanized ? '.35' : '.8'};`)
+      .replace('#include <normal_fragment_begin>', /* glsl */`
+        #include <normal_fragment_begin>
+        float radial = clamp((left + right) * .5 / uWireRadius, -1., 1.);
+        normal = normalize(radial * vWireSide + sqrt(max(0., 1. - radial * radial)) * vWireFront);
+        nonPerturbedNormal = normal;
+      `)
+      .replace('#include <opaque_fragment>', /* glsl */`
+        gl_FragColor = vec4(outgoingLight * uWireLightTransmission * coverage, coverage);
+      `)
   }
-  return { material, depth, uniforms }
+  material.customProgramCacheKey = () => `wire-ribbon-${finish}`
+  return { material, uniforms }
 }
 
 export function createWireGrid(width = 8, height = width, centerY = 1.8, finish: Finish = 'zinc') {
@@ -107,14 +95,8 @@ export function createWireGrid(width = 8, height = width, centerY = 1.8, finish:
   geometry.setAttribute('wirePhase', phases)
   const mesh = new InstancedMesh(geometry, materials.material, capacity)
   mesh.count = 0
-  mesh.customDepthMaterial = materials.depth
-  mesh.layers.enable(1)
-  mesh.castShadow = mesh.receiveShadow = true
+  mesh.layers.set(1)
   mesh.frustumCulled = false
-  let strandCount = 0
-  // Layer 0 needs wire shadows, but no wire color in the garden refraction source.
-  mesh.onBeforeRender = (_renderer, _scene, camera) => { mesh.count = camera.layers.isEnabled(1) ? strandCount : 0 }
-  mesh.onAfterRender = () => { mesh.count = strandCount }
   const matrix = new Matrix4(), position = new Vector3(), scale = new Vector3(), rotation = new Quaternion()
   const zAxis = new Vector3(0, 0, 1)
   let construction = ''
@@ -130,7 +112,7 @@ export function createWireGrid(width = 8, height = width, centerY = 1.8, finish:
     if (key === construction) return
     construction = key
     const depth = embeddedWireDepth(s.thickness, s.wireRadius, s.wireDepth, s.relief, s.rearRelief)
-    strandCount = 0
+    let strandCount = 0
     for (let axis = 0; axis < 2; axis++) {
       const span = axis === 0 ? width : height
       const halfCount = Math.floor((span / 2 - s.wireRadius) / s.wireSpacing)
@@ -151,6 +133,6 @@ export function createWireGrid(width = 8, height = width, centerY = 1.8, finish:
   }
   return {
     mesh, materials, update, surfaceGrid,
-    dispose() { mesh.dispose(); geometry.dispose(); materials.material.dispose(); materials.depth.dispose() },
+    dispose() { mesh.dispose(); geometry.dispose(); materials.material.dispose() },
   }
 }

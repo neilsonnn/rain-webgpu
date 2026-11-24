@@ -89,23 +89,10 @@ export function greenhouseLights() {
   const sun = new DirectionalLight('#fff5dc', 3.8)
   sun.target.position.set(.3, 1.4, -.8)
   sun.position.copy(sun.target.position).addScaledVector(sunDirection, 9)
-  sun.castShadow = true
-  sun.shadow.mapSize.set(2048, 2048)
-  sun.shadow.camera.left = -5; sun.shadow.camera.right = 5
-  sun.shadow.camera.top = 5; sun.shadow.camera.bottom = -5
-  sun.shadow.camera.near = .1; sun.shadow.camera.far = 18
-  sun.shadow.normalBias = .008; sun.shadow.bias = -.00015
   const sky = new HemisphereLight('#d3dfdc', '#18221b', .18)
   const fill = new DirectionalLight('#f0efdf', 2)
   fill.target.position.set(0, 1.6, -.5)
   fill.position.copy(fill.target.position).add(new Vector3(-4, 3, 4))
-  // Resolve the embedded wire's thin shadows from the front of the greenhouse.
-  fill.castShadow = true
-  fill.shadow.mapSize.set(4096, 4096)
-  fill.shadow.camera.left = -2.6; fill.shadow.camera.right = 2.6
-  fill.shadow.camera.top = 2.6; fill.shadow.camera.bottom = -2.6
-  fill.shadow.camera.near = .1; fill.shadow.camera.far = 14
-  fill.shadow.normalBias = .0006; fill.shadow.bias = -.000025
   group.add(sun, sun.target, sky, fill, fill.target)
-  return { group, sun, fill, sky, dispose() { sun.shadow.dispose(); fill.shadow.dispose() } }
+  return { group, sun, fill, sky, dispose() { sun.dispose(); fill.dispose() } }
 }

@@ -124,22 +124,10 @@ export function greenhouseLights(arrangement: Arrangement = 'original') {
   const sun = new DirectionalLight('#fff3d5', 3.2)
   sun.target.position.set(.3, 1.4, -.8)
   sun.position.copy(sun.target.position).addScaledVector(sunDirection, 9)
-  sun.castShadow = true
-  sun.shadow.mapSize.set(2048, 2048)
-  sun.shadow.camera.left = -5; sun.shadow.camera.right = 5
-  sun.shadow.camera.top = 5; sun.shadow.camera.bottom = -5
-  sun.shadow.camera.near = .1; sun.shadow.camera.far = 18
-  sun.shadow.normalBias = .008; sun.shadow.bias = -.00015
   const sky = new HemisphereLight('#cddedb', '#283724', composition.skyFill)
   const fill = new DirectionalLight('#e4e6d4', composition.fill)
   fill.target.position.set(0, 1.6, -.5)
   fill.position.copy(fill.target.position).add(new Vector3(-4, 3, 4))
-  fill.castShadow = true
-  fill.shadow.mapSize.set(4096, 4096)
-  fill.shadow.camera.left = -2.6; fill.shadow.camera.right = 2.6
-  fill.shadow.camera.top = 2.6; fill.shadow.camera.bottom = -2.6
-  fill.shadow.camera.near = .1; fill.shadow.camera.far = 14
-  fill.shadow.normalBias = .0006; fill.shadow.bias = -.000025
   group.add(sun, sun.target, sky, fill, fill.target)
-  return { group, sun, fill, dispose() { sun.shadow.dispose(); fill.shadow.dispose() } }
+  return { group, sun, fill, dispose() { sun.dispose(); fill.dispose() } }
 }
