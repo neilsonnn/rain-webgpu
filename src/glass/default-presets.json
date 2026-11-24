@@ -1,6 +1,6 @@
 {
   "earlier:original": {
-    "rain": false,
+    "rain": true,
     "rainIntensity": 1,
     "rainGlass": 1.33,
     "rainDropSize": 2.31,
