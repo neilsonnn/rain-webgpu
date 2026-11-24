@@ -51,8 +51,8 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
   const orbitCamera = camera.clone()
   orbitCamera.position.set(0, 1.8, 2.25)
   if (options.standalone) {
-    // Look up and right across the pane from a closer, lower-left orbit.
-    const radius = 2.12, yaw = -.36, pitch = Math.PI / 2 + .19
+    // Look up and left across the pane from a closer, lower-right orbit.
+    const radius = 1.55, yaw = .42, pitch = Math.PI / 2 + .19
     orbitCamera.position.set(
       radius * Math.sin(pitch) * Math.sin(yaw),
       1.8 + radius * Math.cos(pitch),
