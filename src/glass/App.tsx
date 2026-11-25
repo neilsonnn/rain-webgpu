@@ -107,6 +107,9 @@ export default function Glass() {
   const ready = readyPreset === sceneKey
   const [opening, setOpening] = useState(() => document.getElementById('glass-opening')?.hidden === false)
   const openingFrame = useRef(opening)
+  const [touchOrbit, setTouchOrbit] = useState(false)
+  const touchOrbitRef = useRef(touchOrbit)
+  touchOrbitRef.current = touchOrbit
   const [saving, setSaving] = useState(false), [saveStatus, setSaveStatus] = useState({ key: sceneKey, text: '' })
   const [panel, setPanel] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null), panelToggle = useRef<HTMLButtonElement>(null)
@@ -161,7 +164,7 @@ export default function Glass() {
     void requestWebGPUAdapter().then(async gpuAdapter => ({ gpuAdapter, module: await profile.loadScene() })).then(({ gpuAdapter, module }) => {
       if (cancelled || !host.current) return
       instance = module.mountGreenhouse(host.current, live, () => { if (!cancelled) setReadyPreset(sceneKey) }, message => { if (!cancelled) setError(message) }, {
-        standalone, quality: qualityRef, gpuAdapter, openingFrame,
+        standalone, quality: qualityRef, gpuAdapter, openingFrame, touchOrbit: touchOrbitRef,
         ...(showStudyTools && {
           timings, onQualityCaps: setQualityCaps, centerTaps: centerTapRef, profileView: profileViewRef,
           onRenderSize: (width: number, height: number) => setRenderSize({ width, height }),
@@ -239,10 +242,11 @@ export default function Glass() {
   return <section className={`glass-experiment ${standalone ? 'glass-standalone' : ''} ${ready && !error ? 'glass-ready' : ''}`} aria-label="Summer, through glass">
     <h1 className="sr-only">Summer, through glass</h1>
     <p className="sr-only" aria-live="polite">{profile.label} version{ready ? ' ready' : ' loading'}</p>
-    <div ref={host} className={`glass-canvas ${version === 'earlier' ? 'glass-water-mode' : ''}`} role="img" tabIndex={standalone && !opening ? 0 : undefined} aria-label={`Sunlit plants behind pebbled glass. ${version === 'earlier' ? 'Left-click or touch to add water. Hold or drag to keep painting. ' : ''}Right-drag or swipe with two fingers to orbit. Scroll or pinch to zoom.${standalone ? ' Arrow keys also orbit.' : ''}`} />
+    <div ref={host} className={`glass-canvas ${version === 'earlier' ? 'glass-water-mode' : ''}`} role="img" tabIndex={standalone && !opening ? 0 : undefined} aria-label={`Sunlit plants behind pebbled glass. ${version === 'earlier' ? 'Left-click or touch to add water. Hold or drag to keep painting. Enable Orbit to navigate with one finger. ' : ''}Move two fingers together to orbit and pinch to zoom during the same gesture. Right-drag to orbit or scroll to zoom.${standalone ? ' Arrow keys also orbit.' : ''}`} />
     {!standalone && !ready && !error && <div className="glass-loading" role="status"><span /> <span className="sr-only">Growing the greenhouse…</span></div>}
     {error && <div className={`glass-error ${error === webGPURequiredMessage ? 'glass-compatibility' : ''}`} role="alert"><p>{error}</p>{showStudyTools && <button type="button" title="Restart the greenhouse" onClick={() => setRetry(value => value + 1)}>Reload scene</button>}</div>}
     {!opening && !error && <div className="glass-tools">
+      {version === 'earlier' && <button type="button" className="glass-orbit-toggle" aria-pressed={touchOrbit} onClick={() => setTouchOrbit(value => !value)}>Orbit</button>}
       {showStudyTools && <button ref={panelToggle} type="button" className="glass-debug-toggle" title="Show or hide settings" aria-expanded={panel} aria-controls="glass-settings" onClick={() => setPanel(value => !value)}>
         <SlidersHorizontalIcon size={14} /><span>Debug</span>
       </button>}

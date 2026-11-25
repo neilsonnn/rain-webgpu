@@ -1,18 +1,22 @@
 import { describe, expect, it, vi } from 'vitest'
 import { PerspectiveCamera, Spherical, Vector3 } from 'three'
 import { orbitLimits, softenOrbit, SoftOrbitControls } from '../src/glass/orbit'
+import { defaults } from '../src/glass/earlier/settings'
+import { attachWaterTouch } from '../src/glass/rain/touch'
 
 class Surface extends EventTarget {
+  clientWidth = 800
   clientHeight = 800
   style = { touchAction: 'pan-y' }
   capture = new Set<number>()
   focus = vi.fn()
+  getBoundingClientRect() { return { left: 0, top: 0, width: this.clientWidth, height: this.clientHeight } }
   setPointerCapture(id: number) { this.capture.add(id) }
   hasPointerCapture(id: number) { return this.capture.has(id) }
   releasePointerCapture(id: number) { this.capture.delete(id) }
 }
 function pointer(surface: Surface, type: string, x: number, y: number, id = 1, pointerType = 'mouse', button = 0) {
-  surface.dispatchEvent(Object.assign(new Event(type), { clientX: x, clientY: y, pointerId: id, pointerType, button }))
+  surface.dispatchEvent(Object.assign(new Event(type), { clientX: x, clientY: y, pointerId: id, pointerType, button, pressure: 0.5 }))
 }
 function setup() {
   const camera = new PerspectiveCamera(), surface = new Surface(), target = new Vector3(0, 1.8, -.4)
@@ -89,6 +93,49 @@ describe('standalone greenhouse orbit', () => {
     orbit.reset()
     expect(pose().theta).toBe(0); expect(pose().phi).toBeCloseTo(Math.PI / 2, 12); expect(pose().radius).toBeCloseTo(initial, 12)
     orbit.dispose()
+  })
+  it('orbits and zooms in one touch gesture while reserving single touches for water or Orbit mode', () => {
+    const { camera, surface, orbit, pose } = setup()
+    const stroke = vi.fn(), invalidate = vi.fn(), touchOrbit = { current: false }
+    vi.stubGlobal('window', Object.assign(new EventTarget(), { clearTimeout, setTimeout }))
+    orbit.enableDamping = false
+    camera.updateMatrixWorld()
+    const touch = attachWaterTouch(surface as unknown as HTMLElement, camera, () => defaults,
+      { ready: true, stroke }, invalidate, () => {}, (dx, dy, ratio) => orbit.drag(dx, dy, ratio),
+      undefined, undefined, touchOrbit)
+    try {
+      const start = pose()
+      pointer(surface, 'pointerdown', 340, 400, 1, 'touch')
+      pointer(surface, 'pointerdown', 460, 400, 2, 'touch')
+      pointer(surface, 'pointermove', 490, 420, 2, 'touch')
+      pointer(surface, 'pointerup', 490, 420, 2, 'touch')
+      pointer(surface, 'pointerup', 340, 400, 1, 'touch')
+      orbit.update()
+      const combined = pose()
+      expect(combined.theta).toBeLessThan(start.theta)
+      expect(combined.radius).toBeLessThan(start.radius)
+      expect(stroke).not.toHaveBeenCalled()
+
+      touchOrbit.current = true
+      pointer(surface, 'pointerdown', 400, 400, 1, 'touch')
+      pointer(surface, 'pointermove', 445, 410, 1, 'touch')
+      pointer(surface, 'pointerup', 445, 410, 1, 'touch')
+      orbit.update()
+      expect(pose().theta).toBeLessThan(combined.theta)
+      expect(pose().radius).toBeCloseTo(combined.radius)
+      expect(stroke).not.toHaveBeenCalled()
+
+      touchOrbit.current = false
+      camera.updateMatrixWorld()
+      pointer(surface, 'pointerdown', 400, 400, 1, 'touch')
+      pointer(surface, 'pointerup', 400, 400, 1, 'touch')
+      expect(stroke).toHaveBeenCalled()
+      expect(surface.capture.size).toBe(0)
+    } finally {
+      touch.dispose()
+      orbit.dispose()
+      vi.unstubAllGlobals()
+    }
   })
   it('amplifies trackpad pinches on the first frame while keeping regular wheel zoom damped', () => {
     const { orbit, surface, pose } = setup()

@@ -363,7 +363,7 @@ export function mountGreenhouse(host: HTMLElement, settings: { current: GlassSet
       controls.update()
     }
     invalidate()
-  }, options.onBrushPressed, paneSize)
+  }, options.onBrushPressed, paneSize, options.touchOrbit)
   const dispose = () => {
     if (disposed) return
     renderTimer.dispose(); glassTimer.dispose()
